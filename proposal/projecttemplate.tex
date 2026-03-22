@@ -1,0 +1,130 @@
+\documentclass{article}
+
+
+\PassOptionsToPackage{numbers}{natbib}
+
+
+% ready for submission
+\usepackage[final,main]{neurips_2025}
+
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage[hidelinks]{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{cleveref}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+
+\title{Formatting Instructions For COMPSCI683 Project}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+
+\author{%
+  Yair Zick \\
+  \texttt{yzick@umass.edu} \\
+  % examples of more authors
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \AND
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+  % \And
+  % Coauthor \\
+  % Affiliation \\
+  % Address \\
+  % \texttt{email} \\
+}
+
+\begin{document}
+
+
+\maketitle
+
+
+% \begin{abstract}
+% Your project does not need to have an abstract, but you will not be penalized for having one. If you do, then make sure it is a \emph{single} paragraph.
+% \end{abstract}
+
+\section{Introduction}\label{sec:intro}
+Please use this template for your project writeup. 
+Your introduction should give a high-level overview of your approach, why it worked, and how you validated it.  
+\subsection{Our Contributions}\label{sec:contrib}
+This subsection should contain an explicit description of what you did in the project. For each contribution, \emph{list exactly which member of the group contributed to which part}.
+
+For example:
+We construct \texttt{AwesomePoker}, an AI poker bot that is able to capably beat state-of-the-art poker agents. 
+We train our bot using fictitous self-play (managed by A and B), and utilize abstraction heuristics (managed by C and D). Our method was able to consistently beat several baseline agents, including Libratus \cite{brown2019poker} (managed by E).
+\subsection{Related Work}\label{sec:related}
+This subsection should contain all the references to related works, methods, approaches and so on. This part should not be longer than two paragraphs. You should also cite as you go. 
+\section{Model and Preliminaries}
+Be explicit when defining concepts: never use a variable without defining it first. 
+In general, define variables using lowercase letters (e.g. $x,y,z$); sets using uppercase letters (e.g. $S,T$); sets of sets/distributions using calligraphic (e.g. $\mathcal X,\mathcal Y$); vectors using $\backslash\texttt{vec}$ (e.g. $\vec x,\vec y$). 
+
+Equations should always be in math environments, e.g. $x+y = 7$, or $\sum_{n = 1}^\infty \frac1{n^2} = \frac{\pi^2}{6}$.
+
+You can use the \texttt{align} environment to typeset big equations, e.g.
+
+\begin{align}
+    x^2+y^2 =& z^2\notag\\
+    x^3 + y^3 = & z^3 \notag\\
+    x^4+y^4 = & z^3 \label{eq:someequation}
+\end{align}
+You can use the \texttt{notag} option to avoid enumerating every line in your environment (as a general rule, do not enumerate equations unless you plan on referencing them later, here I will reference \Cref{eq:someequation}). 
+The introduction and preliminaries should take up no more than 1.5 pages.
+\section{Results}
+Sections following the first two should contain a summary of your analysis, methodology and results. Try to tell us a \emph{story} about the project, rather than just a data dump of results. Why did you do things the way you did? Pretend that you are explaining this to a friend when writing.
+
+Feel free to use the theorem environment encoded above.
+\begin{theorem}
+    Every number is divisible by 5
+\end{theorem}
+\begin{proof}
+    I don't think this is true...
+\end{proof}
+
+\begin{example}
+    Here's an example of how to use the example environment.
+\end{example}
+
+\begin{definition}
+    We say that a number is awesome if it equals to twice the sum of its divisors.
+\end{definition}
+\section{References}
+I recommend you use the same format I do for references, in particular, take a look at the \texttt{literature.bib} file and the \texttt{abb.bib} files (note the very awesome \texttt{@STRING} macros I use!). 
+When citing, do not treat numbered citations as names. We cannot say: ``\cite{Caragiannis2016MNW} show that...''; rather use ``\citet{Caragiannis2016MNW} show that''. You can use \citeauthor{Caragiannis2016MNW} for just the authors' name if needed. Usually this is appropriate if used repeatedly e.g. \citet{bhaskar2021envyfreeness} describe A and B. However, \citeauthor{bhaskar2021envyfreeness} do not describe C and D. 
+
+\bibliographystyle{plainnat}
+\bibliography{abb,literature}
+\appendix
+\section{Additional Results}
+You may include an appendix of arbitrary size to your submission. This may contain extra figures, experiments, discusion etc. Please do not assume that the course staff will read the appendix in detail. Your submission needs to be standalone.
+\end{document}
