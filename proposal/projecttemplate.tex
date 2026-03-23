@@ -1,15 +1,7 @@
 \documentclass{article}
-
-
 \PassOptionsToPackage{numbers}{natbib}
-
-
-% ready for submission
 \usepackage[final,main]{neurips_2025}
-
 \usepackage{amsmath,amsfonts,amssymb,amsthm}
-
-
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
 \usepackage[hidelinks]{hyperref}       % hyperlinks
@@ -26,105 +18,34 @@
 \newtheorem{definition}[theorem]{Definition}
 \newtheorem{example}[theorem]{Example}
 
-\title{Formatting Instructions For COMPSCI683 Project}
-
-
-% The \author macro works with any number of authors. There are two commands
-% used to separate the names and addresses of multiple authors: \And and \AND.
-%
-% Using \And between authors leaves it to LaTeX to determine where to break the
-% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
-% authors names on the first line, and the last on the second line, try using
-% \AND instead of \And before the third author name.
-
+\title{CS 683 AI Poker Agent Project Proposal}
 
 \author{%
-  Yair Zick \\
-  \texttt{yzick@umass.edu} \\
-  % examples of more authors
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \AND
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
+  Nathan Pearce \\
+  \texttt{npearce@umass.edu} \And
+  Albi Marini \\
+  \texttt{albimarini@umass.edu} \AND
+  Girirajan Soundar Rajan \\
+  \texttt{gsoundarraja@umass.edu} \And
+  Sumit Saurabh \\
+  \texttt{ssaurabh@umass.edu}
 }
 
 \begin{document}
-
-
 \maketitle
 
+\section{Introduction and Project Plan}
 
-% \begin{abstract}
-% Your project does not need to have an abstract, but you will not be penalized for having one. If you do, then make sure it is a \emph{single} paragraph.
-% \end{abstract}
+Our project group will develop and implement the AI poker agent as described in the final project instructions. Poker is suitable for an AI application as it is a zero-sum game with hidden information, random events, and an exceedingly large search space, making brute-force search impractical. Our agent will combine depth-limited adversarial search with a heuristic evaluation function that estimates the value of non-terminal states using information such as hand strength, pot size, board context, and observed opponent behavior.
 
-\section{Introduction}\label{sec:intro}
-Please use this template for your project writeup. 
-Your introduction should give a high-level overview of your approach, why it worked, and how you validated it.  
-\subsection{Our Contributions}\label{sec:contrib}
-This subsection should contain an explicit description of what you did in the project. For each contribution, \emph{list exactly which member of the group contributed to which part}.
+\subsection{Our Contributions}
 
-For example:
-We construct \texttt{AwesomePoker}, an AI poker bot that is able to capably beat state-of-the-art poker agents. 
-We train our bot using fictitous self-play (managed by A and B), and utilize abstraction heuristics (managed by C and D). Our method was able to consistently beat several baseline agents, including Libratus \cite{brown2019poker} (managed by E).
-\subsection{Related Work}\label{sec:related}
-This subsection should contain all the references to related works, methods, approaches and so on. This part should not be longer than two paragraphs. You should also cite as you go. 
-\section{Model and Preliminaries}
-Be explicit when defining concepts: never use a variable without defining it first. 
-In general, define variables using lowercase letters (e.g. $x,y,z$); sets using uppercase letters (e.g. $S,T$); sets of sets/distributions using calligraphic (e.g. $\mathcal X,\mathcal Y$); vectors using $\backslash\texttt{vec}$ (e.g. $\vec x,\vec y$). 
+To make the final project more novel, we will incorporate two research-inspired ideas beyond the basic fixed-abstraction poker bot. First, the agent will use dynamic abstraction, meaning that it will reason coarsely in routine situations but switch to fine-grained reasoning in strategically important situations, such as later betting rounds after the river with large pots. Second, the agent will use robust opponent modeling, where it tracks the opponent's betting patterns over repeated hands and cautiously adjusts play to exploit predictable behavior. These ideas will be evaluated by comparing the full agent against simpler baselines, such as a fixed-abstraction version and a version without opponent modeling, and we expect this comparison to show whether the added techniques improve decision quality/match performance.
 
-Equations should always be in math environments, e.g. $x+y = 7$, or $\sum_{n = 1}^\infty \frac1{n^2} = \frac{\pi^2}{6}$.
+\section{Role of Each Team Member}
 
-You can use the \texttt{align} environment to typeset big equations, e.g.
+We plan to divide the work evenly among each group member as follows:
 
-\begin{align}
-    x^2+y^2 =& z^2\notag\\
-    x^3 + y^3 = & z^3 \notag\\
-    x^4+y^4 = & z^3 \label{eq:someequation}
-\end{align}
-You can use the \texttt{notag} option to avoid enumerating every line in your environment (as a general rule, do not enumerate equations unless you plan on referencing them later, here I will reference \Cref{eq:someequation}). 
-The introduction and preliminaries should take up no more than 1.5 pages.
-\section{Results}
-Sections following the first two should contain a summary of your analysis, methodology and results. Try to tell us a \emph{story} about the project, rather than just a data dump of results. Why did you do things the way you did? Pretend that you are explaining this to a friend when writing.
+Nathan will implement the final \texttt{declareaction()} pipeline and integrate all helper functions written by group members. Albi will code the helper functions for dynamic abstraction. Girirajan will code the helper functions for opponent modeling. Sumit will implement the offline self-play training for parameter tuning and agent comparisons. All four group members will jointly write the final report.
 
-Feel free to use the theorem environment encoded above.
-\begin{theorem}
-    Every number is divisible by 5
-\end{theorem}
-\begin{proof}
-    I don't think this is true...
-\end{proof}
-
-\begin{example}
-    Here's an example of how to use the example environment.
-\end{example}
-
-\begin{definition}
-    We say that a number is awesome if it equals to twice the sum of its divisors.
-\end{definition}
-\section{References}
-I recommend you use the same format I do for references, in particular, take a look at the \texttt{literature.bib} file and the \texttt{abb.bib} files (note the very awesome \texttt{@STRING} macros I use!). 
-When citing, do not treat numbered citations as names. We cannot say: ``\cite{Caragiannis2016MNW} show that...''; rather use ``\citet{Caragiannis2016MNW} show that''. You can use \citeauthor{Caragiannis2016MNW} for just the authors' name if needed. Usually this is appropriate if used repeatedly e.g. \citet{bhaskar2021envyfreeness} describe A and B. However, \citeauthor{bhaskar2021envyfreeness} do not describe C and D. 
-
-\bibliographystyle{plainnat}
-\bibliography{abb,literature}
-\appendix
-\section{Additional Results}
-You may include an appendix of arbitrary size to your submission. This may contain extra figures, experiments, discusion etc. Please do not assume that the course staff will read the appendix in detail. Your submission needs to be standalone.
 \end{document}
