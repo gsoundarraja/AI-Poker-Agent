@@ -1,9 +1,6 @@
 # expectiminimax https://en.wikipedia.org/wiki/Expectiminimax
 # agent is max, opp is MIN
 
-import math
-import random
-
 def _ev_action(action, pot, to_call, inc, win_rate, opp_dist):
     # fold = 0, call = wr * pot - (1-wr)*call
     # raise = exp over opp distribution (fold, call, raise)
@@ -13,7 +10,7 @@ def _ev_action(action, pot, to_call, inc, win_rate, opp_dist):
     if action == "call":
         return win_rate * pot -  (1.0 - win_rate) *to_call
     if action == "raise":
-        # pay
+        # pay 
         R = to_call + inc
 
         p_fold  = opp_dist.get("fold", 0.35)
@@ -40,25 +37,17 @@ def choose_best_action(features, win_rate, opp_dist, valid_actions, budget= 0.4)
     scores = {}
     for action in ("fold", "call", "raise"):
         if action in legal:
-            scores[action] = _ev_action(action, pot, to_call,inc, win_rate, opp_dist)
+            scores[action] = _ev_action(action, pot, to_call, inc, win_rate, opp_dist)
     if not scores:
         return "fold"
-    # nvr fold free
-    if to_call == 0 and "fold" in scores:
-        del scores["fold"]
+    # tie break prefer call
+    best_action = max(scores, key=lambda a: (scores[a], 1 if a == "call" else 0))
 
-    best_score = max(scores.values())
+    # raise if clearly strong
+    if ("raise" in scores and "call" in scores and scores["raise"] >= scores["call"] - 1.0 and win_rate > 0.6):
+        best_action = "raise"
 
-    # softmax stochastic similar actions within 15 chips
-    candidates = {a: v  for a, v in scores.items() if (best_score - v)<= 15.0}
-    if len(candidates) == 1:
-        return next(iter(candidates))
-    weights = {a: math.exp((v -best_score) / 6.0) for a, v in candidates.items()}
-    total = sum(weights.values())
-    r = random.random()* total
-    cum = 0.0
-    for a, w in weights.items():
-        cum += w
-        if r <= cum:
-            return a
-    return max(candidates, key=lambda k: candidates[k])
+    if best_action == "fold" and to_call == 0 and "call" in scores:
+        best_action = "call"
+
+    return best_action
