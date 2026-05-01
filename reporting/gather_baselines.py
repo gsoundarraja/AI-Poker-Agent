@@ -3,6 +3,7 @@ import csv
 import os
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -68,29 +69,30 @@ def main():
 
     os.makedirs(os.path.dirname(OUT_CSV), exist_ok=True)
     t0 = time.time()
-    with open(OUT_CSV, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["opponent", "games", "hands_total",
-                    "pokeragent_chips", "opponent_chips",
-                    "pokeragent_wins", "opponent_wins",
-                    "chips_per_game", "elapsed_sec"])
-        for name, cls in OPPONENTS:
-            print("Running PokerAgent vs {}...".format(name))
-            res = run_match(
-                PokerAgent, cls, "PokerAgent", name,
-                num_games=args.games, max_round=args.hands,
-                initial_stack=args.stack, sb_amount=args.small_blind,
-                verbose=0,
-            )
-            w.writerow([name, res["games"], res["hands_total"],
-                        res["agent1_chips"], res["agent2_chips"],
-                        res["wins1"], res["wins2"],
-                        round(res["chips_per_game_1"], 1),
-                        round(res["elapsed_sec"], 1)])
-            f.flush()
-            print("  chips/game: {:+.1f}  ({}/{} games  in {:.1f}s)"
-                  .format(res["chips_per_game_1"], res["wins1"], res["games"],
-                          res["elapsed_sec"]))
+    n_workers = os.cpu_count() or 4
+    with ProcessPoolExecutor(max_workers = n_workers) as pool:
+        with ThreadPoolExecutor(max_workers = len(OPPONENTS)) as tpool:
+            futures = {}
+            for name, cls in OPPONENTS:
+                print("Submitting PokerAgent vs {}".format(name))
+                futures[name] = (cls, tpool.submit(run_match, PokerAgent, cls, "PokerAgent", name,
+                                                   args.games, args.hands, args.stack, args.small_blind, 0, pool, name))
+            with open(OUT_CSV, "w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(["opponent", "games", "hands_total",
+                            "pokeragent_chips", "opponent_chips",
+                            "pokeragent_wins", "opponent_wins",
+                            "chips_per_game", "elapsed_sec"])
+                for name, (_cls, fut) in futures.items():
+                    res = fut.result()
+                    w.writerow([name, res["games"], res["hands_total"],
+                                res["agent1_chips"], res["agent2_chips"],
+                                res["wins1"], res["wins2"],
+                                round(res["chips_per_game_1"], 1),
+                                round(res["elapsed_sec"], 1)])
+                    f.flush()
+                    print("  {} chips/game: {:+.1f}  ({}/{} games)"
+                          .format(name, res["chips_per_game_1"], res["wins1"], res["games"]))
     print("Wrote {}  (total {:.1f}s)".format(OUT_CSV, time.time() - t0))
 
 

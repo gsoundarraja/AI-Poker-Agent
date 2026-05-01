@@ -4,6 +4,17 @@ import pickle
 from pypokerengine.utils.card_utils import estimate_hole_card_win_rate, gen_cards
 from . import abstraction
 
+# less mc eval for training
+_FAST_MC_SIMS = int(os.environ["POKERAGENT_FAST_MC"]) if os.environ.get("POKERAGENT_FAST_MC", "").isdigit() else None
+
+def set_fast_mc(n):
+    global _FAST_MC_SIMS
+    _FAST_MC_SIMS = n
+    if n is None:
+        os.environ.pop("POKERAGENT_FAST_MC", None)
+    else:
+        os.environ["POKERAGENT_FAST_MC"] = str(n)
+
 # load precomputed preflop handstrengths
 _PREFLOP_HS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "preflop_hs.pkl")
 _PREFLOP_HS_CACHE = None
@@ -31,7 +42,6 @@ DEFAULT_WEIGHTS = {
     "w_position": 0.10,
     "w_fold_equity": 0.35,
     "w_pot_commit": 0.20,
-    # prefer to call by default
     "bias_fold": -0.50,
     "bias_call": 0.00,
     "bias_raise": -0.10,
@@ -48,9 +58,14 @@ def win_rate_mc(hole_card, community_card, nb_simulation= 200, nb_player =2):
             return cached
     return estimate_hole_card_win_rate(nb_simulation =nb_simulation, nb_player= nb_player, hole_card = gen_cards(hole_card), community_card = gen_cards(community_card) if community_card else [])
 
-# use more sim if more time remain
-def adaptive_win_rate(hole_card, community_card, time_budget):
-    if time_budget > 0.30:
+# more MC sims w big budget
+def adaptive_win_rate(hole_card, community_card, time_budget, street=None, pot=None, stack=None):
+    if _FAST_MC_SIMS is not None:
+        return win_rate_mc(hole_card, community_card, nb_simulation =_FAST_MC_SIMS)
+    if street is not None and pot is not None and stack is not None:
+        k = abstraction.dynamic_bucket_count(street, pot, stack)
+        n = max(100, min(500, k * 25))  # k in [3,20] -> n in [100,500]
+    elif time_budget > 0.30:
         n = 500
     elif time_budget > 0.15:
         n = 250

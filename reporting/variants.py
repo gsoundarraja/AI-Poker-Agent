@@ -11,17 +11,13 @@ class NoOppModelAgent(PokerAgent):
         )
 
 class NoDynAbsAgent(PokerAgent):
-    def __init__(self):
-        super().__init__()
-
-        self._orig_dynamic_bucket_count = _abs.dynamic_bucket_count
+    def declare_action(self, valid_actions, hole_card, round_state):
+        orig = _abs.dynamic_bucket_count
         _abs.dynamic_bucket_count = lambda street, pot, stack: 8
-
-    def __del__(self):
         try:
-            _abs.dynamic_bucket_count = self._orig_dynamic_bucket_count
-        except Exception:
-            pass
+            return super().declare_action(valid_actions, hole_card, round_state)
+        finally:
+            _abs.dynamic_bucket_count = orig
 
 class NoSearchAgent(PokerAgent):
     def declare_action(self, valid_actions, hole_card, round_state):
@@ -53,10 +49,21 @@ class NoTuningAgent(PokerAgent):
         return dict(_ev.DEFAULT_WEIGHTS)
     
 class NoPreflopCacheAgent(PokerAgent):
-    def __init__(self):
-        super().__init__()
-        _ev._PREFLOP_HS_CACHE = None
-        _ev._PREFLOP_HS_LOAD_ATTEMPTED = True
+    def declare_action(self, valid_actions, hole_card, round_state):
+        from pypokerengine.utils.card_utils import estimate_hole_card_win_rate, gen_cards
+        orig = _ev.win_rate_mc
+        def _no_cache(hole_card, community_card, nb_simulation=200, nb_player=2):
+            if not hole_card:
+                return 0.5
+            return estimate_hole_card_win_rate(
+                nb_simulation=nb_simulation, nb_player=nb_player,
+                hole_card=gen_cards(hole_card),
+                community_card=gen_cards(community_card) if community_card else [])
+        _ev.win_rate_mc = _no_cache
+        try:
+            return super().declare_action(valid_actions, hole_card, round_state)
+        finally:
+            _ev.win_rate_mc = orig
 
 
 VARIANTS = [

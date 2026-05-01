@@ -1,43 +1,15 @@
-# macOS / editor noise
 .DS_Store
-.vscode/
-.idea/
-
-# Python bytecode and caches
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Virtual environments
+*.pyc
 .venv/
-venv/
-env/
-ENV/
-
-# Packaging / test outputs
-build/
-dist/
-*.egg-info/
-.coverage
-.coverage.*
-htmlcov/
-
-# LaTeX build artifacts
 *.aux
 *.bbl
-*.bcf
 *.blg
+*.out
+*.synctex.gz
 *.fdb_latexmk
 *.fls
-*.lof
 *.log
-*.lot
-*.out
-*.pdf
-*.run.xml
-*.synctex.gz
-*.toc
+*.zip
+*.bak
+submission/*
