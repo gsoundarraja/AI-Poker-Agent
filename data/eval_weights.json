@@ -1,0 +1,10 @@
+{
+  "w_hs": 0.703125,
+  "w_pot_odds": 0.421875,
+  "w_position": 0.1725,
+  "w_fold_equity": 0.24609374999999994,
+  "w_pot_commit": 0.2375,
+  "bias_fold": -0.9765625,
+  "bias_call": 0.0,
+  "bias_raise": -0.15000000000000002
+}

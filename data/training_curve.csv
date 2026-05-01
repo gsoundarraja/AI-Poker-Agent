@@ -1,0 +1,15 @@
+sweep,key,delta_chips_per_game,accepted,value_after
+0,w_hs,1447.5,True,0.9375
+0,w_pot_odds,1352.5,True,0.5625
+0,w_position,457.5,True,0.22999999999999998
+0,w_fold_equity,12.5,True,0.24609374999999994
+0,w_pot_commit,220.0,True,0.1875
+0,bias_fold,630.0,True,-0.78125
+0,bias_raise,602.5,True,-0.2
+1,w_hs,357.5,True,0.703125
+1,w_pot_odds,1742.5,True,0.421875
+1,w_position,607.5,True,0.1725
+1,w_fold_equity,-457.5,False,0.24609374999999994
+1,w_pot_commit,557.5,True,0.2375
+1,bias_fold,450.0,True,-0.9765625
+1,bias_raise,87.5,True,-0.15000000000000002

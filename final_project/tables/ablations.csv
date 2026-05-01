@@ -1,0 +1,6 @@
+variant,games,hands_total,full_chips,variant_chips,full_wins,variant_wins,chips_per_game_full,elapsed_sec
+-OppModel,8,800,85640,74360,5,3,705.0,200.0
+-DynAbs,8,800,79700,80300,4,4,-37.5,192.0
+-Search,8,800,86820,73180,6,2,852.5,116.1
+-Tuning,8,800,78100,81900,2,6,-237.5,190.2
+-PreflopCache,8,800,73960,86040,3,5,-755.0,194.7

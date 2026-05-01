@@ -1,0 +1,5 @@
+opponent,games,hands_total,pokeragent_chips,opponent_chips,pokeragent_wins,opponent_wins,chips_per_game,elapsed_sec
+RandomPlayer,8,800,128440,31560,8,0,6055.0,50.4
+RaisedPlayer,8,800,90060,69940,5,3,1257.5,102.6
+TightPassive,8,800,97540,62460,8,0,2192.5,63.2
+LooseAggr,8,800,104710,55290,7,1,3088.8,85.0
