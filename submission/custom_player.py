@@ -27,12 +27,11 @@ class CustomPlayer(BasePokerPlayer):
                 feats = features.extract_state_features(round_state, hole_card, self.uuid, self.initial_stack)
                 #calc win rate via MC
                 remaining = DECIDE_BUDGET - (time.time() - t0)
-                win_rate = evaluation.adaptive_win_rate(hole_card, feats["community"], time_budget= remaining)
+                win_rate = evaluation.adaptive_win_rate(hole_card, feats["community"], time_budget= remaining, street = feats["street"], pot = feats["pot"], stack = feats["agent_stack"])
                 # predict opp policy
                 opp_dist = self.opp_model.predict_action_distribution(feats["opp_uuid"], feats["street"], facing_raise =(feats["to_call"] > 0))
                 # expectiminimax https://en.wikipedia.org/wiki/Expectiminimax
-                remaining = max(0.02, DECIDE_BUDGET - (time.time() - t0))
-                action = search.choose_best_action(feats, win_rate, opp_dist, valid_actions, budget= remaining)
+                action = search.choose_best_action(feats, win_rate, opp_dist, valid_actions, self.weights)
                 #if cant rais do call
                 action = self._downgrade_unaffordable_raise(action, feats, valid_actions)
                 return self._ensure_legal(action, valid_actions)

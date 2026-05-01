@@ -1,18 +1,39 @@
 # expectiminimax https://en.wikipedia.org/wiki/Expectiminimax
 # agent is max, opp is MIN
 
-import math
-import random
+from . import evaluation as ev
 
-def _ev_action(action, pot, to_call, inc, win_rate, opp_dist):
-    # fold = 0, call = wr * pot - (1-wr)*call
-    # raise = exp over opp distribution (fold, call, raise)
-    if action =="fold":
-        return 0.0
+# chip weight for trained eval phi(s) + bonus from exp val
+PHI_SCALE = 50.0
 
-    if action == "call":
-        return win_rate * pot -  (1.0 - win_rate) *to_call
+def _phi_bonus(action, features, win_rate, fold_eq, weights):
+    base = ev.phi(features, win_rate, fold_eq, weights)
+    bias = weights.get("bias_" + action, 0.0)
+    if action == "fold":
+        # - fold when state is good
+        return PHI_SCALE * (bias - max(0.0, base))
     if action == "raise":
+        # raise reward good hand/equity
+        extra = weights["w_fold_equity"] * fold_eq * 0.5 + weights["w_hs"] * max(0.0, win_rate - 0.5)
+        return PHI_SCALE * (bias + base + extra)
+    # call
+    check_bonus = 0.15 if features.get("to_call", 0) == 0 else 0.0
+    return PHI_SCALE * (bias + base + check_bonus)
+
+def _ev_action(action, features, win_rate, opp_dist, weights):
+    # fold = 0 call = wr * pot - (1-wr)*call
+    # raise = exp over opp distribution (fold, call, raise)
+    pot     = features["pot"]
+    to_call = features["to_call"]
+    inc     = features["raise_increment"]
+    fold_eq = opp_dist.get("fold", 0.35)
+
+    if action =="fold":
+        base = 0.0
+
+    elif action == "call":
+        base = win_rate * pot -  (1.0 - win_rate) *to_call
+    elif action == "raise":
         # pay
         R = to_call + inc
 
@@ -27,38 +48,31 @@ def _ev_action(action, pot, to_call, inc, win_rate, opp_dist):
         # call * (R+inc) or 2*inc
         ev_if_call_3bet = (win_rate * (pot + 2 * inc)- (1.0 - win_rate) * (R + inc))
         ev_opp_raise = max(ev_if_fold_to_3bet, ev_if_call_3bet)
-        return p_fold * ev_opp_fold + p_call * ev_opp_call + p_raise * ev_opp_raise
-    return 0.0
+        base = p_fold * ev_opp_fold + p_call * ev_opp_call + p_raise * ev_opp_raise
+    else:
+        return 0.0
+
+    return base + _phi_bonus(action, features, win_rate, fold_eq, weights)
 
 # best = highest expectiminimax
-def choose_best_action(features, win_rate, opp_dist, valid_actions, budget= 0.4):
+def choose_best_action(features, win_rate, opp_dist, valid_actions, weights):
     legal = {a["action"] for a in valid_actions}
-    pot = features["pot"]
     to_call = features["to_call"]
-    inc = features["raise_increment"]
 
     scores = {}
     for action in ("fold", "call", "raise"):
         if action in legal:
-            scores[action] = _ev_action(action, pot, to_call,inc, win_rate, opp_dist)
+            scores[action] = _ev_action(action, features, win_rate, opp_dist, weights)
     if not scores:
         return "fold"
-    # nvr fold free
-    if to_call == 0 and "fold" in scores:
-        del scores["fold"]
+    # tie break prefer call
+    best_action = max(scores, key=lambda a: (scores[a], 1 if a == "call" else 0))
 
-    best_score = max(scores.values())
+    # raise if clearly strong
+    if ("raise" in scores and "call" in scores and scores["raise"] >= scores["call"] - 1.0 and win_rate > 0.6):
+        best_action = "raise"
 
-    # softmax stochastic similar actions within 15 chips
-    candidates = {a: v  for a, v in scores.items() if (best_score - v)<= 15.0}
-    if len(candidates) == 1:
-        return next(iter(candidates))
-    weights = {a: math.exp((v -best_score) / 6.0) for a, v in candidates.items()}
-    total = sum(weights.values())
-    r = random.random()* total
-    cum = 0.0
-    for a, w in weights.items():
-        cum += w
-        if r <= cum:
-            return a
-    return max(candidates, key=lambda k: candidates[k])
+    if best_action == "fold" and to_call == 0 and "call" in scores:
+        best_action = "call"
+
+    return best_action
