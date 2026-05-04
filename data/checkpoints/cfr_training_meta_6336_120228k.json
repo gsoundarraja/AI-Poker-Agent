@@ -1,0 +1,23 @@
+{
+  "batches": 20038,
+  "elapsed_sec": 43201.386457920074,
+  "infosets": 6336,
+  "merge_interval": 300,
+  "previous_batches": 0,
+  "previous_elapsed_sec": 0.0,
+  "previous_traversals": 0,
+  "run_batches": 20038,
+  "run_elapsed_sec": 43201.386457920074,
+  "run_id": "20260502-222802",
+  "run_traversals": 120228000,
+  "seed": 683,
+  "small_blind": 10,
+  "stack": 1000,
+  "total_batches": 20038,
+  "total_elapsed_sec": 43201.386457920074,
+  "total_traversals": 120228000,
+  "trainer_rules": "compact_pypokerengine_v2",
+  "traversals": 120228000,
+  "utility_sum_last_batch": -210.29117336019954,
+  "workers": 10
+}

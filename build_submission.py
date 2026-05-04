@@ -14,11 +14,31 @@ def fresh_dir(path):
         shutil.rmtree(path)
     os.makedirs(path)
 
-EXCLUDE_FILENAMES = {".DS_Store", "training_curve.csv"}
+EXCLUDE_FILENAMES = {
+    ".DS_Store",
+    "training_curve.csv",
+    "cfr_training_curve.csv",
+    "cfr_training.lock",
+    "eval_weights.json",
+    "preflop_hs.pkl",
+}
+
+EXCLUDE_DIRNAMES = {
+    "checkpoints",
+}
 
 
 def _ignore(_dir, names):
-    return [n for n in names if n in EXCLUDE_FILENAMES or n.startswith("__pycache__")]
+    return [
+        n for n in names
+        if (
+            n in EXCLUDE_FILENAMES
+            or n in EXCLUDE_DIRNAMES
+            or n.startswith("__pycache__")
+            or n.endswith(".bak")
+            or n.endswith(".zip")
+        )
+    ]
 
 
 def copy_tree(src_rel, dst_rel):

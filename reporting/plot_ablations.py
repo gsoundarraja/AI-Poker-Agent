@@ -2,12 +2,15 @@ import csv
 import os
 import sys
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(ROOT, "final_project", ".mplconfig"))
+os.environ.setdefault("XDG_CACHE_HOME", os.path.join(ROOT, "final_project", ".cache"))
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_PATH = os.path.join(ROOT, "final_project", "tables", "ablations.csv")
 OUT_PATH = os.path.join(ROOT, "final_project", "figures", "ablations.pdf")
 

@@ -20,7 +20,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--games", type=int, default=8)
     ap.add_argument("--hands", type=int, default=100)
-    ap.add_argument("--stack", type=int, default=10000)
+    ap.add_argument("--stack", type=int, default=1000)
     ap.add_argument("--small-blind", type=int, default=10)
     args = ap.parse_args()
 
@@ -39,13 +39,18 @@ def main():
                 w.writerow(["variant", "games", "hands_total",
                             "full_chips", "variant_chips",
                             "full_wins", "variant_wins",
-                            "chips_per_game_full", "elapsed_sec"])
+                            "chips_per_game_full", "best_game_gain",
+                            "worst_game_gain", "std_game_gain",
+                            "elapsed_sec"])
                 for name, fut in futures.items():
                     res = fut.result()
                     w.writerow([name, res["games"], res["hands_total"],
                                 res["agent1_chips"], res["agent2_chips"],
                                 res["wins1"], res["wins2"],
                                 round(res["chips_per_game_1"], 1),
+                                round(res["best_game_gain_1"], 1),
+                                round(res["worst_game_gain_1"], 1),
+                                round(res["std_game_gain_1"], 1),
                                 round(res["elapsed_sec"], 1)])
                     f.flush()
                     print("  Full vs {}: {:+.1f}  ({}/{} games)"

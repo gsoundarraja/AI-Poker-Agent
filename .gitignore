@@ -12,4 +12,7 @@ __pycache__/
 *.log
 *.zip
 *.bak
+*.lock
 submission/*
+final_project/.cache/
+final_project/.mplconfig/
