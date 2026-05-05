@@ -3,23 +3,32 @@ import os
 import random
 
 from . import cfr_abstraction as absn
+from .preflop_lookup import PreflopLookup
 
 
 class CFRPolicy:
-    def __init__(self, strategy=None, abstraction=None):
+    def __init__(self, strategy=None, abstraction=None, use_preflop_lookup=False):
         self.strategy = strategy or {}
         self.abstraction = abstraction or absn.default_abstraction()
         self._keys = list(self.strategy.keys())
+        self._preflop = (
+            PreflopLookup.from_policy(self.strategy, self.abstraction)
+            if use_preflop_lookup else None
+        )
 
     @classmethod
-    def load(cls, strategy_path, abstraction_path):
+    def load(cls, strategy_path, abstraction_path, use_preflop_lookup=False):
         abstraction = absn.load_abstraction(abstraction_path)
         strategy = {}
         if strategy_path and os.path.exists(strategy_path):
             with open(strategy_path, "r") as f:
                 payload = json.load(f)
             strategy = payload.get("average_strategy", payload if isinstance(payload, dict) else {})
-        return cls(strategy=strategy, abstraction=abstraction)
+        return cls(
+            strategy=strategy,
+            abstraction=abstraction,
+            use_preflop_lookup=use_preflop_lookup,
+        )
 
     def choose_action(self, valid_actions, hole_card, round_state, player_uuid, rng=None):
         rng = rng or random
@@ -30,6 +39,12 @@ class CFRPolicy:
         legal = self._legal_actions(valid_actions)
         if not legal:
             return {"fold": 1.0}
+        if self._preflop is not None:
+            preflop = self._preflop.distribution(
+                valid_actions, hole_card, round_state, player_uuid
+            )
+            if preflop is not None:
+                return preflop
         key = absn.runtime_infoset(self.abstraction, round_state, hole_card, player_uuid)
         probs = self._lookup_probs(key)
         masked = {a: max(0.0, float(probs.get(a, 0.0))) for a in legal}

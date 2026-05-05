@@ -546,6 +546,12 @@ def main():
     parser.add_argument("--rebuild-abstraction", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max-batches", type=int, default=0)
+    parser.add_argument(
+        "--target-total-traversals",
+        type=int,
+        default=0,
+        help="Stop after the checkpoint reaches at least this total traversal count",
+    )
     parser.add_argument("--force-lock", action="store_true")
     parser.add_argument("--cfr-plus", action="store_true")
     args = parser.parse_args()
@@ -619,10 +625,14 @@ def main():
     print("Training MCCFR: workers={}, merge_interval={}, stack={}, sb={}".format(
         workers, args.merge_interval, args.stack, args.small_blind), flush=True)
     print("Regret update: {}".format(regret_update), flush=True)
+    if args.target_total_traversals:
+        print("Target total traversals: {}".format(args.target_total_traversals), flush=True)
 
     with ProcessPoolExecutor(max_workers=workers) as pool:
         while True:
             if args.max_batches and batches >= args.max_batches:
+                break
+            if args.target_total_traversals and previous_traversals + traversals >= args.target_total_traversals:
                 break
             if args.minutes > 0 and time.time() >= deadline:
                 break

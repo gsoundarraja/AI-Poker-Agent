@@ -2,6 +2,7 @@ import random
 
 from pypokerengine.players import BasePokerPlayer
 
+from agent.cfr_policy import CFRPolicy
 from pokeragent import PokerAgent
 
 
@@ -42,13 +43,42 @@ class UniformPolicy:
 
 class NoCFRPolicyAgent(PokerAgent):
     def __init__(self):
-        super().__init__(use_opponent_model=True)
+        super().__init__(use_belief_search=False, use_preflop_lookup=False)
         self._policy = UniformPolicy()
 
 
-class CFRNoOpponentModelAgent(PokerAgent):
+class CFRBlueprintAgent(PokerAgent):
     def __init__(self):
-        super().__init__(use_opponent_model=False)
+        super().__init__(use_belief_search=False, use_preflop_lookup=False)
+
+
+class PreflopLookupAgent(PokerAgent):
+    def __init__(self):
+        super().__init__(use_belief_search=False, use_preflop_lookup=True)
+
+
+class PublicBeliefDynamicSearchAgent(PokerAgent):
+    def __init__(self):
+        super().__init__(use_belief_search=True, use_preflop_lookup=False)
+
+
+class FullExperimentalAgent(PokerAgent):
+    def __init__(self):
+        super().__init__(use_belief_search=True, use_preflop_lookup=True)
+
+
+class CheckpointAgent(PokerAgent):
+    def __init__(self, strategy_path, abstraction_path, use_belief_search=False,
+                 use_preflop_lookup=False):
+        super().__init__(
+            use_belief_search=use_belief_search,
+            use_preflop_lookup=use_preflop_lookup,
+        )
+        self._policy = CFRPolicy.load(
+            strategy_path,
+            abstraction_path,
+            use_preflop_lookup=use_preflop_lookup,
+        )
 
 
 class UniformLegalAgent(BasePokerPlayer):
@@ -97,9 +127,20 @@ class RaiseOnlyAgent(BasePokerPlayer):
 
 
 VARIANTS = [
+    ("CFRBlueprint", CFRBlueprintAgent),
+    ("PreflopLookup", PreflopLookupAgent),
+    ("PublicBeliefDynamicSearch", PublicBeliefDynamicSearchAgent),
+    ("FullExperimental", FullExperimentalAgent),
     ("NoCFRPolicy", NoCFRPolicyAgent),
-    ("CFRNoOpponentModel", CFRNoOpponentModelAgent),
     ("UniformLegal", UniformLegalAgent),
     ("CallOnly", CallOnlyAgent),
     ("RaiseOnly", RaiseOnlyAgent),
+]
+
+
+COMPONENT_VARIANTS = [
+    ("CFRBlueprint", CFRBlueprintAgent),
+    ("PreflopLookup", PreflopLookupAgent),
+    ("PublicBeliefDynamicSearch", PublicBeliefDynamicSearchAgent),
+    ("FullExperimental", FullExperimentalAgent),
 ]
