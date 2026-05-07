@@ -1,0 +1,2 @@
+opponents,games_per_opponent,hands_per_game,mean_chips_per_game,min_opponent_chips_per_game,max_opponent_chips_per_game,best_game_gain,worst_game_gain
+13,64,100,424.1,19.4,963.3,1000,-1000

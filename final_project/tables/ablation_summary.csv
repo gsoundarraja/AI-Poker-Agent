@@ -1,0 +1,5 @@
+variant,mode,suite,opponents,games_per_opponent,hands_per_game,mean_chips_per_game,min_chips_per_game,max_chips_per_game,win_fraction
+Preflop,opponents,all,13,32,100,420.4,-40.9,962.5,0.717
+CFR,opponents,all,13,32,100,402.0,-218.8,975.0,0.743
+Full,opponents,all,13,32,100,370.3,-149.7,936.2,0.716
+Search,opponents,all,13,32,100,297.7,-231.2,951.9,0.667

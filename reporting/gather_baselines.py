@@ -23,9 +23,7 @@ from training.selfplay import run_match
 OUT_CSV = os.path.join(ROOT, "final_project", "tables", "baselines.csv")
 
 
-class TightPassive(BasePokerPlayer):
-    def declare_action(self, valid_actions, hole_card, round_state):
-        return "call"
+class _BaseOpponent(BasePokerPlayer):
     def receive_game_start_message(self, game_info): pass
     def receive_round_start_message(self, round_count, hole_card, seats): pass
     def receive_street_start_message(self, street, round_state): pass
@@ -33,13 +31,21 @@ class TightPassive(BasePokerPlayer):
     def receive_round_result_message(self, winners, hand_info, round_state): pass
 
 
-class LooseAggr(BasePokerPlayer):
+class CallBot(_BaseOpponent):
+    def declare_action(self, valid_actions, hole_card, round_state):
+        legal = _legal(valid_actions)
+        if "call" in legal:
+            return "call"
+        return next(iter(legal))
+
+
+class LooseBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
-        import random
         self._rng = random.Random(1234)
+
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         r = self._rng.random()
         if r < 0.70 and "raise" in legal:
             return "raise"
@@ -48,14 +54,9 @@ class LooseAggr(BasePokerPlayer):
         if "fold" in legal:
             return "fold"
         return next(iter(legal))
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
 
-class ProbRaise(BasePokerPlayer):
+class ProbRaise(_BaseOpponent):
     raise_prob = 0.5
     call_prob = 0.9
     seed = 683
@@ -65,7 +66,7 @@ class ProbRaise(BasePokerPlayer):
         self._rng = random.Random(self.seed)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         r = self._rng.random()
         if "raise" in legal and r < self.raise_prob:
             return "raise"
@@ -75,32 +76,26 @@ class ProbRaise(BasePokerPlayer):
             return "fold"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class Raise50(ProbRaise):
+class RaiseHalfBot(ProbRaise):
     raise_prob = 0.50
     call_prob = 0.92
     seed = 1050
 
 
-class Raise90(ProbRaise):
+class RaiseMostBot(ProbRaise):
     raise_prob = 0.90
     call_prob = 0.98
     seed = 1090
 
 
-class PreflopAggroPostflopSticky(BasePokerPlayer):
+class PreflopRaiseBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6831)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         street = round_state.get("street", "preflop")
         r = self._rng.random()
         if street == "preflop" and "raise" in legal and r < 0.85:
@@ -111,40 +106,28 @@ class PreflopAggroPostflopSticky(BasePokerPlayer):
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class CallingStation(BasePokerPlayer):
+class CallMostlyBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6832)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         if "raise" in legal and self._rng.random() < 0.08:
             return "raise"
         if "call" in legal:
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class PressureFolder(BasePokerPlayer):
+class FoldToBetBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6833)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         facing = _is_facing_bet(round_state, getattr(self, "uuid", None))
         if facing and "fold" in legal and self._rng.random() < 0.70:
             return "fold"
@@ -154,14 +137,8 @@ class PressureFolder(BasePokerPlayer):
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class ValueRegular(BasePokerPlayer):
+class ValueBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6840)
@@ -172,14 +149,8 @@ class ValueRegular(BasePokerPlayer):
             self._rng, raise_hi=0.76, call_lo=0.42, fold_lo=0.40, bluff=0.03,
         )
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class NittyValue(BasePokerPlayer):
+class TightBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6841)
@@ -190,14 +161,8 @@ class NittyValue(BasePokerPlayer):
             self._rng, raise_hi=0.86, call_lo=0.52, fold_lo=0.56, bluff=0.0,
         )
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class BalancedPressure(BasePokerPlayer):
+class PressureBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6842)
@@ -208,14 +173,8 @@ class BalancedPressure(BasePokerPlayer):
             self._rng, raise_hi=0.70, call_lo=0.38, fold_lo=0.34, bluff=0.11,
         )
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class ShowdownRegular(BasePokerPlayer):
+class ShowdownBot(_BaseOpponent):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(6843)
@@ -226,36 +185,29 @@ class ShowdownRegular(BasePokerPlayer):
             self._rng, raise_hi=0.82, call_lo=0.32, fold_lo=0.28, bluff=0.02,
         )
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
+# validation opponents
 CORE_OPPONENTS = [
-    ("RandomPlayer",  RandomPlayer),
-    ("RaisedPlayer",  RaisedPlayer),
-    ("TightPassive",  TightPassive),
-    ("LooseAggr",     LooseAggr),
+    ("Random", RandomPlayer),
+    ("Raise", RaisedPlayer),
+    ("Call", CallBot),
+    ("Loose", LooseBot),
 ]
 
 EXTENDED_OPPONENTS = [
-    ("Raise50", Raise50),
-    ("Raise90", Raise90),
-    ("PreflopAggroSticky", PreflopAggroPostflopSticky),
-    ("CallingStation", CallingStation),
-    ("PressureFolder", PressureFolder),
+    ("Raise mix", RaiseHalfBot),
+    ("Raise often", RaiseMostBot),
+    ("Preflop raise", PreflopRaiseBot),
+    ("Call mostly", CallMostlyBot),
+    ("Fold to bets", FoldToBetBot),
 ]
 
 FIELD_OPPONENTS = [
-    ("ValueRegular", ValueRegular),
-    ("NittyValue", NittyValue),
-    ("BalancedPressure", BalancedPressure),
-    ("ShowdownRegular", ShowdownRegular),
+    ("Value", ValueBot),
+    ("Tight", TightBot),
+    ("Pressure", PressureBot),
+    ("Showdown", ShowdownBot),
 ]
-
-OPPONENTS = CORE_OPPONENTS
 
 
 def _is_facing_bet(round_state, uuid):
@@ -278,7 +230,7 @@ def _is_facing_bet(round_state, uuid):
 
 def _strength_policy(valid_actions, hole_card, round_state, uuid, rng,
                      raise_hi, call_lo, fold_lo, bluff):
-    legal = {a["action"] for a in valid_actions}
+    legal = _legal(valid_actions)
     strength = _hand_strength(hole_card, round_state)
     facing = _is_facing_bet(round_state, uuid)
     street = round_state.get("street", "preflop")
@@ -298,6 +250,10 @@ def _strength_policy(valid_actions, hole_card, round_state, uuid, rng,
     if "fold" in legal:
         return "fold"
     return next(iter(legal))
+
+
+def _legal(valid_actions):
+    return set(absn.legal_action_names(valid_actions))
 
 
 def _hand_strength(hole_card, round_state):
@@ -331,7 +287,7 @@ def opponent_suite(name, extended=False):
         return FIELD_OPPONENTS
     if name == "all":
         return CORE_OPPONENTS + EXTENDED_OPPONENTS + FIELD_OPPONENTS
-    raise ValueError("unknown opponent suite: {}".format(name))
+    raise ValueError("bad suite: {}".format(name))
 
 
 def main():
@@ -352,7 +308,7 @@ def main():
         with ThreadPoolExecutor(max_workers = len(opponents)) as tpool:
             futures = {}
             for name, cls in opponents:
-                print("Submitting PokerAgent vs {}".format(name))
+                print("run PokerAgent vs {}".format(name))
                 futures[name] = (cls, tpool.submit(run_match, PokerAgent, cls, "PokerAgent", name,
                                                    args.games, args.hands, args.stack, args.small_blind, 0, pool, name))
             with open(OUT_CSV, "w", newline="") as f:
@@ -380,7 +336,7 @@ def main():
                                 round(res["std_game_gain_1"], 1),
                                 round(res["elapsed_sec"], 1)])
                     f.flush()
-                    print("  {} chips/game: {:+.1f}  ({}/{} games)"
+                    print("{} {:+.1f} ({}/{})"
                           .format(name, res["chips_per_game_1"], res["wins1"], res["games"]))
     summary_path = os.path.join(os.path.dirname(OUT_CSV), "baseline_summary.csv")
     with open(summary_path, "w", newline="") as f:
@@ -397,8 +353,8 @@ def main():
             round(best_game_gain if best_game_gain is not None else 0.0, 1),
             round(worst_game_gain if worst_game_gain is not None else 0.0, 1),
         ])
-    print("Wrote {}  (total {:.1f}s)".format(OUT_CSV, time.time() - t0))
-    print("Wrote {}".format(summary_path))
+    print("wrote {} ({:.1f}s)".format(OUT_CSV, time.time() - t0))
+    print("wrote {}".format(summary_path))
 
 
 if __name__ == "__main__":

@@ -9,29 +9,25 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir))
 from pypokerengine.api.game import setup_config, start_poker
 
+# play agent1 against agent2 for num hands games stack
 def _import(path):
     mod_name, cls_name = path.rsplit(".", 1)
     module = importlib.import_module(mod_name)
     return getattr(module, cls_name)
 
-# self play partner
+
 def _build_agent(spec):
     kwargs = spec.get("kwargs", {})
-    if "weights" in spec:
-        from pokeragent import PokerAgent
-        class TunedAgent(PokerAgent):
-            def _load_weights(self, path):
-                return dict(spec["weights"])
-        return TunedAgent()
     return spec["cls"](**kwargs)
 
-# setup for processpoool
+
 def _play_one(spec1, spec2, name1, name2, max_round, initial_stack, sb_amount):
     config = setup_config(max_round = max_round, initial_stack = initial_stack, small_blind_amount = sb_amount)
     config.register_player(name = name1, algorithm = _build_agent(spec1))
     config.register_player(name = name2, algorithm = _build_agent(spec2))
     result = start_poker(config, verbose = 0)
     return result["players"][0]["stack"], result["players"][1]["stack"]
+
 
 def _run_inner(spec1, spec2, name1, name2, num_games, max_round, initial_stack, sb_amount, executor = None, label = None):
     t0 = time.time()
@@ -70,7 +66,7 @@ def _run_inner(spec1, spec2, name1, name2, num_games, max_round, initial_stack, 
         "elapsed_sec": time.time() - t0,
     }
 
-#  n games of m hands, cpg
+
 def run_match(agent1_cls, agent2_cls, name1, name2, num_games, max_round,
               initial_stack, sb_amount, verbose = 0, executor = None, label = None,
               agent1_kwargs = None, agent2_kwargs = None):
@@ -81,11 +77,6 @@ def run_match(agent1_cls, agent2_cls, name1, name2, num_games, max_round,
         executor = executor, label = label,
     )
 
-def run_match_weighted(weights1, weights2, name1, name2, num_games, max_round, initial_stack, sb_amount, executor = None, label = None):
-    return _run_inner({"weights": weights1}, {"weights": weights2}, name1, name2, num_games, max_round, initial_stack, sb_amount, executor = executor, label = label)
-
-def run_match_mixed(weights1, opp_cls, name1, name2, num_games, max_round, initial_stack, sb_amount, executor = None, label = None):
-    return _run_inner({"weights": weights1}, {"cls": opp_cls}, name1, name2, num_games, max_round, initial_stack, sb_amount, executor = executor, label = label)
 
 def main():
     ap = argparse.ArgumentParser()

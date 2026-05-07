@@ -2,13 +2,14 @@ import random
 
 from pypokerengine.players import BasePokerPlayer
 
+from agent import cfr_abstraction as absn
 from agent.cfr_policy import CFRPolicy
 from pokeragent import PokerAgent
 
 
 class UniformPolicy:
     def action_distribution(self, valid_actions, hole_card, round_state, player_uuid):
-        legal = self._legal_actions(valid_actions)
+        legal = absn.legal_action_names(valid_actions)
         if not legal:
             return {"fold": 1.0}
         p = 1.0 / len(legal)
@@ -18,51 +19,38 @@ class UniformPolicy:
         rng = rng or random
         if not probs:
             return "fold"
-        total = sum(max(0.0, float(p)) for p in probs.values())
-        if total <= 1e-12:
-            return rng.choice(list(probs))
-        pick = rng.random() * total
+        probs = absn.normalize_probs(probs)
+        pick = rng.random()
         acc = 0.0
         for action, prob in probs.items():
-            acc += max(0.0, float(prob))
+            acc += prob
             if pick <= acc:
                 return action
         return list(probs)[-1]
 
-    def _legal_actions(self, valid_actions):
-        legal = [a["action"] for a in valid_actions]
-        call_amount = None
-        for action in valid_actions:
-            if action.get("action") == "call":
-                call_amount = action.get("amount")
-                break
-        if isinstance(call_amount, (int, float)) and call_amount <= 0 and "call" in legal:
-            legal = [a for a in legal if a != "fold"]
-        return legal
 
-
-class NoCFRPolicyAgent(PokerAgent):
+class NoPolicyAgent(PokerAgent):
     def __init__(self):
         super().__init__(use_belief_search=False, use_preflop_lookup=False)
         self._policy = UniformPolicy()
 
 
-class CFRBlueprintAgent(PokerAgent):
+class CFRAgent(PokerAgent):
     def __init__(self):
         super().__init__(use_belief_search=False, use_preflop_lookup=False)
 
 
-class PreflopLookupAgent(PokerAgent):
+class PreflopAgent(PokerAgent):
     def __init__(self):
         super().__init__(use_belief_search=False, use_preflop_lookup=True)
 
 
-class PublicBeliefDynamicSearchAgent(PokerAgent):
+class SearchAgent(PokerAgent):
     def __init__(self):
         super().__init__(use_belief_search=True, use_preflop_lookup=False)
 
 
-class FullExperimentalAgent(PokerAgent):
+class FullAgent(PokerAgent):
     def __init__(self):
         super().__init__(use_belief_search=True, use_preflop_lookup=True)
 
@@ -79,68 +67,61 @@ class CheckpointAgent(PokerAgent):
             abstraction_path,
             use_preflop_lookup=use_preflop_lookup,
         )
+        if self._belief_search is not None:
+            self._belief_search.policy = self._policy
 
 
-class UniformLegalAgent(BasePokerPlayer):
+class _BasePlayer(BasePokerPlayer):
+    def receive_game_start_message(self, game_info): pass
+    def receive_round_start_message(self, round_count, hole_card, seats): pass
+    def receive_street_start_message(self, street, round_state): pass
+    def receive_game_update_message(self, new_action, round_state): pass
+    def receive_round_result_message(self, winners, hand_info, round_state): pass
+
+
+class RandomAgent(_BasePlayer):
     def __init__(self):
         super().__init__()
         self._rng = random.Random(683)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        return self._rng.choice([a["action"] for a in valid_actions])
-
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
+        legal = absn.legal_action_names(valid_actions)
+        return self._rng.choice(legal or ["fold"])
 
 
-class CallOnlyAgent(BasePokerPlayer):
+class CallAgent(_BasePlayer):
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = set(absn.legal_action_names(valid_actions))
         if "call" in legal:
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-class RaiseOnlyAgent(BasePokerPlayer):
+class RaiseAgent(_BasePlayer):
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = set(absn.legal_action_names(valid_actions))
         if "raise" in legal:
             return "raise"
         if "call" in legal:
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
-
 
 VARIANTS = [
-    ("CFRBlueprint", CFRBlueprintAgent),
-    ("PreflopLookup", PreflopLookupAgent),
-    ("PublicBeliefDynamicSearch", PublicBeliefDynamicSearchAgent),
-    ("FullExperimental", FullExperimentalAgent),
-    ("NoCFRPolicy", NoCFRPolicyAgent),
-    ("UniformLegal", UniformLegalAgent),
-    ("CallOnly", CallOnlyAgent),
-    ("RaiseOnly", RaiseOnlyAgent),
+    ("CFR", CFRAgent),
+    ("Preflop", PreflopAgent),
+    ("Search", SearchAgent),
+    ("Full", FullAgent),
+    ("NoPolicy", NoPolicyAgent),
+    ("Random", RandomAgent),
+    ("Call", CallAgent),
+    ("Raise", RaiseAgent),
 ]
 
 
 COMPONENT_VARIANTS = [
-    ("CFRBlueprint", CFRBlueprintAgent),
-    ("PreflopLookup", PreflopLookupAgent),
-    ("PublicBeliefDynamicSearch", PublicBeliefDynamicSearchAgent),
-    ("FullExperimental", FullExperimentalAgent),
+    ("CFR", CFRAgent),
+    ("Preflop", PreflopAgent),
+    ("Search", SearchAgent),
+    ("Full", FullAgent),
 ]

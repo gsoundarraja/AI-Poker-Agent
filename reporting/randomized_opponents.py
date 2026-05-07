@@ -2,10 +2,18 @@ import random
 
 from pypokerengine.players import BasePokerPlayer
 
-from reporting.gather_baselines import _hand_strength, _is_facing_bet
+from reporting.gather_baselines import _hand_strength, _is_facing_bet, _legal
 
 
-class ParametricStyleOpponent(BasePokerPlayer):
+class _BaseOpponent(BasePokerPlayer):
+    def receive_game_start_message(self, game_info): pass
+    def receive_round_start_message(self, round_count, hole_card, seats): pass
+    def receive_street_start_message(self, street, round_state): pass
+    def receive_game_update_message(self, new_action, round_state): pass
+    def receive_round_result_message(self, winners, hand_info, round_state): pass
+
+
+class ParametricStyleOpponent(_BaseOpponent):
     def __init__(
         self,
         seed=0,
@@ -30,7 +38,7 @@ class ParametricStyleOpponent(BasePokerPlayer):
         self.trap_slowplay = float(trap_slowplay)
 
     def declare_action(self, valid_actions, hole_card, round_state):
-        legal = {a["action"] for a in valid_actions}
+        legal = _legal(valid_actions)
         street = round_state.get("street", "preflop")
         facing = _is_facing_bet(round_state, getattr(self, "uuid", None))
         strength = _hand_strength(hole_card, round_state)
@@ -60,19 +68,14 @@ class ParametricStyleOpponent(BasePokerPlayer):
             return "call"
         return next(iter(legal))
 
-    def receive_game_start_message(self, game_info): pass
-    def receive_round_start_message(self, round_count, hole_card, seats): pass
-    def receive_street_start_message(self, street, round_state): pass
-    def receive_game_update_message(self, new_action, round_state): pass
-    def receive_round_result_message(self, winners, hand_info, round_state): pass
 
-
-FAMILIES = ("value", "nit", "pressure", "station", "loose_aggressive", "folder")
+# random validation bots
+FAMILIES = ("value", "tight", "pressure", "caller", "loose", "fold")
 FAMILY_INDEX = {name: i for i, name in enumerate(FAMILIES)}
 
 
 def family_params(family, seed):
-    rng = random.Random((FAMILY_INDEX[family] + 1) * 1_000_003 + int(seed))
+    rng = random.Random(int(seed) + 1000 * (FAMILY_INDEX[family] + 1))
     if family == "value":
         return {
             "seed": seed,
@@ -85,7 +88,7 @@ def family_params(family, seed):
             "sticky_call": rng.uniform(0.25, 0.55),
             "trap_slowplay": rng.uniform(0.00, 0.08),
         }
-    if family == "nit":
+    if family == "tight":
         return {
             "seed": seed,
             "raise_hi": rng.uniform(0.82, 0.94),
@@ -109,7 +112,7 @@ def family_params(family, seed):
             "sticky_call": rng.uniform(0.20, 0.48),
             "trap_slowplay": rng.uniform(0.00, 0.05),
         }
-    if family == "station":
+    if family == "caller":
         return {
             "seed": seed,
             "raise_hi": rng.uniform(0.76, 0.90),
@@ -121,7 +124,7 @@ def family_params(family, seed):
             "sticky_call": rng.uniform(0.70, 0.98),
             "trap_slowplay": rng.uniform(0.00, 0.12),
         }
-    if family == "loose_aggressive":
+    if family == "loose":
         return {
             "seed": seed,
             "raise_hi": rng.uniform(0.55, 0.72),
@@ -133,7 +136,7 @@ def family_params(family, seed):
             "sticky_call": rng.uniform(0.35, 0.70),
             "trap_slowplay": rng.uniform(0.00, 0.04),
         }
-    if family == "folder":
+    if family == "fold":
         return {
             "seed": seed,
             "raise_hi": rng.uniform(0.78, 0.92),
@@ -145,16 +148,16 @@ def family_params(family, seed):
             "sticky_call": rng.uniform(0.00, 0.18),
             "trap_slowplay": rng.uniform(0.00, 0.06),
         }
-    raise ValueError("unknown randomized opponent family: {}".format(family))
+    raise ValueError("bad family: {}".format(family))
 
 
 def randomized_opponent_specs(split, per_family=2, seed=683):
-    split_offsets = {"train": 10_000, "validation": 20_000, "test": 30_000}
-    offset = split_offsets.get(split, 40_000)
+    split_offsets = {"train": 10000, "validation": 20000, "test": 30000}
+    offset = split_offsets.get(split, 40000)
     specs = []
     for family in FAMILIES:
         for i in range(per_family):
-            opp_seed = offset + seed + 101 * i + 997 * FAMILIES.index(family)
+            opp_seed = offset + seed + i + 10 * FAMILIES.index(family)
             name = "{}_{}_{}".format(split, family, i)
             specs.append((name, ParametricStyleOpponent, family_params(family, opp_seed)))
     return specs

@@ -27,8 +27,7 @@ def main():
     ap.add_argument("--suite", choices=("core", "extended", "field", "all"), default="field")
     ap.add_argument("--mode", choices=("opponents", "head-to-head"), default="opponents")
     ap.add_argument("--include-controls", action="store_true")
-    ap.add_argument("--variants", default="",
-                    help="Comma-separated variant names to run, e.g. CFRBlueprint,PublicBeliefDynamicSearch")
+    ap.add_argument("--variants", default="")
     args = ap.parse_args()
 
     os.makedirs(os.path.dirname(OUT_CSV), exist_ok=True)
@@ -51,7 +50,7 @@ def _run_against_opponents(args):
             for variant_name, VariantCls in variants:
                 for opponent_name, OpponentCls in opponents:
                     label = "{} vs {}".format(variant_name, opponent_name)
-                    print("Submitting {}".format(label))
+                    print("run {}".format(label))
                     futures[(variant_name, opponent_name)] = tpool.submit(
                         run_match,
                         VariantCls,
@@ -85,7 +84,7 @@ def _run_against_opponents(args):
                     "elapsed_sec": round(res["elapsed_sec"], 1),
                 }
                 rows.append(row)
-                print("  {} vs {}: {:+.1f} ({}/{})".format(
+                print("{} vs {} {:+.1f} ({}/{})".format(
                     variant_name,
                     opponent_name,
                     res["chips_per_game_1"],
@@ -100,7 +99,7 @@ def _run_against_opponents(args):
         "std_game_gain", "elapsed_sec",
     ])
     _write_summary(rows, args)
-    print("Wrote {} and {} (total {:.1f}s)".format(
+    print("wrote {} and {} ({:.1f}s)".format(
         OUT_CSV, SUMMARY_CSV, time.time() - t0
     ))
 
@@ -115,7 +114,7 @@ def _run_head_to_head(args):
         with ThreadPoolExecutor(max_workers=len(variants)) as tpool:
             futures = {}
             for name, VariantCls in variants:
-                print("Submitting PokerAgent vs {}".format(name))
+                print("run PokerAgent vs {}".format(name))
                 futures[name] = tpool.submit(
                     run_match,
                     PokerAgent,
@@ -147,7 +146,7 @@ def _run_head_to_head(args):
                     "std_game_gain": round(res["std_game_gain_1"], 1),
                     "elapsed_sec": round(res["elapsed_sec"], 1),
                 })
-                print("  PokerAgent vs {}: {:+.1f} ({}/{})".format(
+                print("PokerAgent vs {} {:+.1f} ({}/{})".format(
                     name, res["chips_per_game_1"], res["wins1"], res["games"]
                 ))
 
@@ -158,7 +157,7 @@ def _run_head_to_head(args):
         "std_game_gain", "elapsed_sec",
     ])
     _write_summary(rows, args)
-    print("Wrote {} and {} (total {:.1f}s)".format(
+    print("wrote {} and {} ({:.1f}s)".format(
         OUT_CSV, SUMMARY_CSV, time.time() - t0
     ))
 
@@ -211,7 +210,7 @@ def _select_variants(args):
     found = {name for name, _ in selected}
     missing = sorted(requested - found)
     if missing:
-        raise ValueError("unknown variants: {}".format(", ".join(missing)))
+        raise ValueError("bad variants: {}".format(", ".join(missing)))
     return selected
 
 

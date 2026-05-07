@@ -1,0 +1,2 @@
+run_id,regret_update,checkpoints,first_traversals,last_traversals,elapsed_min,infosets,last_utility
+20260504-234804,cfr,2,142914000,143004000,846.01,6336,724.215

@@ -1,0 +1,4 @@
+checkpoint,rep,run_id,all_mean,worst_opponent_mean,best_opponent_mean,core_mean,core_worst,extended_extra_mean,extended_extra_worst,field_mean,field_worst
+145002,1,1,380.29999999999995,27.7,935.0,482.72499999999997,79.6,565.5,138.3,46.375,27.7
+145002,2,2,421.9923076923077,-10.2,943.5,523.625,134.8,608.3599999999999,261.3,87.4,-10.2
+145002,3,3,413.04615384615386,36.9,926.9,467.25,36.9,603.0,60.2,121.4,39.6

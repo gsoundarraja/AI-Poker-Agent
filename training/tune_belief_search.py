@@ -10,6 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from agent.belief_search import DEFAULT_PARAMS
 from pokeragent import PokerAgent
 from reporting.gather_baselines import opponent_suite
 from training.selfplay import run_match
@@ -19,29 +20,28 @@ OUT_JSON = os.path.join(ROOT, "data", "belief_search_params.json")
 OUT_CSV = os.path.join(ROOT, "final_project", "tables", "belief_search_tuning.csv")
 CHECKPOINT_DIR = os.path.join(ROOT, "data", "checkpoints")
 
-BASE_PARAMS = {
-    "action_likelihood_floor": 0.025,
-    "credibility_multiplier_base": 0.75,
-    "credibility_multiplier_scale": 0.5,
-    "credibility_samples": 24,
-    "large_call_blend_bonus": 0.04,
-    "large_call_blend_units": 6.0,
-    "large_pot_blend_bonus": 0.04,
-    "large_pot_blend_units": 36.0,
-    "max_blend": 0.26,
-    "max_combos": 40,
-    "max_fold_to_raise": 0.95,
-    "policy_margin_uncertain": 0.1,
-    "range_cache_limit": 128,
-    "range_log_floor": -30.0,
-    "river_blend_base": 0.18,
-    "river_pot_units": 34.0,
-    "river_to_call_units": 5.0,
-    "samples": 48,
-    "turn_blend_base": 0.12,
-    "turn_pot_units": 50.0,
-    "turn_to_call_units": 8.0,
-    "uncertain_blend_bonus": 0.05,
+# values to try
+PARAM_CHOICES = {
+    "max_combos": [24, 32, 40, 56, 72],
+    "samples": [24, 36, 48, 72],
+    "policy_margin_uncertain": [0.06, 0.08, 0.10, 0.13, 0.16],
+    "river_pot_units": [22.0, 28.0, 34.0, 42.0, 52.0],
+    "river_to_call_units": [3.0, 4.0, 5.0, 7.0],
+    "turn_pot_units": [38.0, 50.0, 64.0, 80.0],
+    "turn_to_call_units": [6.0, 8.0, 11.0],
+    "action_likelihood_floor": [0.015, 0.025, 0.04, 0.06],
+    "credibility_samples": [12, 18, 24, 36],
+    "credibility_multiplier_base": [0.60, 0.75, 0.90],
+    "credibility_multiplier_scale": [0.20, 0.35, 0.50, 0.70],
+    "max_fold_to_raise": [0.70, 0.80, 0.90, 0.95],
+    "turn_blend_base": [0.04, 0.08, 0.12, 0.16],
+    "river_blend_base": [0.08, 0.12, 0.18, 0.24],
+    "uncertain_blend_bonus": [0.0, 0.03, 0.05, 0.08],
+    "large_pot_blend_units": [28.0, 36.0, 48.0],
+    "large_pot_blend_bonus": [0.0, 0.03, 0.05, 0.08],
+    "large_call_blend_units": [4.0, 6.0, 8.0],
+    "large_call_blend_bonus": [0.0, 0.03, 0.05, 0.08],
+    "max_blend": [0.10, 0.16, 0.22, 0.30, 0.40],
 }
 
 
@@ -57,12 +57,11 @@ def main():
     ap.add_argument("--suite", choices=("core", "extended", "field", "all"), default="field")
     ap.add_argument("--workers", type=int, default=max(1, os.cpu_count() or 1))
     ap.add_argument("--seed", type=int, default=68305)
-    ap.add_argument("--write-enabled", action="store_true",
-                    help="Write best params enabled=true instead of leaving search disabled.")
+    ap.add_argument("--write-enabled", action="store_true")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
-    candidates = [dict(BASE_PARAMS)]
+    candidates = [dict(DEFAULT_PARAMS)]
     while len(candidates) < args.candidates:
         candidates.append(sample_params(rng))
 
@@ -88,7 +87,7 @@ def main():
                               args.stack, args.small_blind, pool, "final{}".format(rank))
             final_row = make_row("final", rank, params, result)
             rows.append(final_row)
-            print("finalist {} score={:+.1f} mean={:+.1f} min={:+.1f}".format(
+            print("final {} score={:+.1f} mean={:+.1f} min={:+.1f}".format(
                 rank,
                 float(final_row["score"]),
                 float(final_row["mean_cpg"]),
@@ -113,7 +112,7 @@ def main():
             "min_cpg": float(best["min_cpg"]),
             "win_fraction": float(best["win_fraction"]),
             "elapsed_sec": round(time.time() - t0, 1),
-            "note": "Belief-search hyperparameters selected by validation; CFR blueprint was not retrained.",
+            "note": "tuned by selfplay",
         },
     }
     write_json(OUT_JSON, payload)
@@ -121,9 +120,9 @@ def main():
         args.suite, time.strftime("%Y%m%d-%H%M%S")
     )
     write_json(os.path.join(CHECKPOINT_DIR, checkpoint_name), payload)
-    print("Wrote {}".format(OUT_CSV))
-    print("Wrote {}".format(OUT_JSON))
-    print("Best score={:+.1f} mean={:+.1f} min={:+.1f} enabled={}".format(
+    print("wrote {}".format(OUT_CSV))
+    print("wrote {}".format(OUT_JSON))
+    print("best score={:+.1f} mean={:+.1f} min={:+.1f} enabled={}".format(
         float(best["score"]),
         float(best["mean_cpg"]),
         float(best["min_cpg"]),
@@ -132,29 +131,9 @@ def main():
 
 
 def sample_params(rng):
-    params = dict(BASE_PARAMS)
-    params.update({
-        "max_combos": rng.choice([24, 32, 40, 56, 72]),
-        "samples": rng.choice([24, 36, 48, 72]),
-        "policy_margin_uncertain": rng.choice([0.06, 0.08, 0.10, 0.13, 0.16]),
-        "river_pot_units": rng.choice([22.0, 28.0, 34.0, 42.0, 52.0]),
-        "river_to_call_units": rng.choice([3.0, 4.0, 5.0, 7.0]),
-        "turn_pot_units": rng.choice([38.0, 50.0, 64.0, 80.0]),
-        "turn_to_call_units": rng.choice([6.0, 8.0, 11.0]),
-        "action_likelihood_floor": rng.choice([0.015, 0.025, 0.04, 0.06]),
-        "credibility_samples": rng.choice([12, 18, 24, 36]),
-        "credibility_multiplier_base": rng.choice([0.60, 0.75, 0.90]),
-        "credibility_multiplier_scale": rng.choice([0.20, 0.35, 0.50, 0.70]),
-        "max_fold_to_raise": rng.choice([0.70, 0.80, 0.90, 0.95]),
-        "turn_blend_base": rng.choice([0.04, 0.08, 0.12, 0.16]),
-        "river_blend_base": rng.choice([0.08, 0.12, 0.18, 0.24]),
-        "uncertain_blend_bonus": rng.choice([0.0, 0.03, 0.05, 0.08]),
-        "large_pot_blend_units": rng.choice([28.0, 36.0, 48.0]),
-        "large_pot_blend_bonus": rng.choice([0.0, 0.03, 0.05, 0.08]),
-        "large_call_blend_units": rng.choice([4.0, 6.0, 8.0]),
-        "large_call_blend_bonus": rng.choice([0.0, 0.03, 0.05, 0.08]),
-        "max_blend": rng.choice([0.10, 0.16, 0.22, 0.30, 0.40]),
-    })
+    params = dict(DEFAULT_PARAMS)
+    for key, choices in PARAM_CHOICES.items():
+        params[key] = rng.choice(choices)
     return params
 
 
@@ -194,7 +173,7 @@ def make_row(stage, candidate, params, result):
     losses = sum(res["wins2"] for res in result.values())
     mean = sum(cpgs.values()) / float(max(1, len(cpgs)))
     min_cpg = min(cpgs.values()) if cpgs else 0.0
-    score = mean + 0.50 * min_cpg
+    score = mean
     row = {
         "stage": stage,
         "candidate": candidate,
@@ -210,7 +189,7 @@ def make_row(stage, candidate, params, result):
 
 
 def print_result(idx, total, row):
-    print("candidate {}/{} score={:+.1f} mean={:+.1f} min={:+.1f}".format(
+    print("cand {}/{} score={:+.1f} mean={:+.1f} min={:+.1f}".format(
         idx, total, float(row["score"]), float(row["mean_cpg"]), float(row["min_cpg"])
     ))
 

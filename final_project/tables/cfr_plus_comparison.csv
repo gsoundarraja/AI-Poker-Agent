@@ -1,0 +1,4 @@
+model,All opponents,Poker-like bots,Worst opponent
+Selected CFR,424.0,106.3,19.4
+CFR+ raw,233.9,233.9,-167.0
+CFR+ tuned,325.6,325.6,-161.4

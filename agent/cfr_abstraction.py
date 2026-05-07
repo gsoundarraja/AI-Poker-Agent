@@ -7,13 +7,58 @@ from pypokerengine.engine.card import Card
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 
 
+# make buckets of states
 ACTIONS = ("fold", "call", "raise")
-STREET_TO_INDEX = {"preflop": 0, "flop": 1, "turn": 2, "river": 3}
+INFOSET_STREET = 0
+INFOSET_PLAYER = 1
+INFOSET_POSITION = 2
+INFOSET_CARD_BUCKET = 3
+INFOSET_POT_BUCKET = 4
+INFOSET_CALL_BUCKET = 5
+INFOSET_STREET_RAISES = 6
+INFOSET_TOTAL_RAISES = 7
+INFOSET_MAX_BET = 8
+INFOSET_FACING = 9
+INFOSET_LENGTH = 10
 INDEX_TO_STREET = ("preflop", "flop", "turn", "river")
 RANK_ORDER = "23456789TJQKA"
 CARD_BY_ID = [None] + [Card.from_id(cid) for cid in range(1, 53)]
 RANK_BY_ID = [0] + [CARD_BY_ID[cid].rank for cid in range(1, 53)]
 SUIT_BY_ID = [None] + [CARD_BY_ID[cid].suit for cid in range(1, 53)]
+
+
+def normalize_probs(probs):
+    total = sum(max(0.0, float(v)) for v in probs.values())
+    if total <= 1e-12:
+        n = max(1, len(probs))
+        return {a: 1.0 / n for a in probs}
+    return {a: max(0.0, float(v)) / total for a, v in probs.items()}
+
+
+def legal_action_names(valid_actions):
+    legal = [a["action"] for a in valid_actions]
+    call_amount = None
+    for action in valid_actions:
+        if action.get("action") == "call":
+            call_amount = action.get("amount")
+            break
+    # free check
+    if isinstance(call_amount, (int, float)) and call_amount <= 0 and "call" in legal:
+        legal = [a for a in legal if a != "fold"]
+    return legal
+
+
+def mask_probs(probs, valid_actions):
+    legal = legal_action_names(valid_actions)
+    return normalize_probs({a: max(0.0, float(probs.get(a, 0.0))) for a in legal})
+
+
+def parse_infoset_key(key):
+    try:
+        vals = tuple(int(x) for x in key.split("|"))
+    except Exception:
+        return None
+    return vals if len(vals) == INFOSET_LENGTH else None
 
 
 def load_abstraction(path):
@@ -53,6 +98,7 @@ def default_abstraction():
     }
 
 
+# learn bucket abstraction from random
 def learn_abstraction(samples, seed, card_buckets=8, pot_buckets=6, to_call_buckets=5):
     rng = random.Random(seed)
     preflop = {key: [0.0, 0.0] for key in all_preflop_classes()}
@@ -138,6 +184,7 @@ def card_bucket(metadata, hole_ids, community_ids):
     street_idx = street_index_from_board_len(len(community_ids))
     max_bucket = int(metadata.get("card_buckets", 8)) - 1
     if street_idx == 0:
+        # card -> hand class
         key = preflop_class_from_ids(hole_ids)
         bucket_map = metadata.get("preflop_bucket_map", {})
         if key in bucket_map:
@@ -153,6 +200,7 @@ def infoset_key(metadata, player, hole_ids, community_ids, pot, to_call, street_
     sb = float(max(1, small_blind))
     street_idx = street_index_from_board_len(len(community_ids))
     c_bucket = card_bucket(metadata, hole_ids, community_ids)
+    # money in pot
     pot_bucket = bucket_value(
         float(pot) / sb,
         metadata.get("pot_thresholds", []),
@@ -179,7 +227,7 @@ def infoset_key(metadata, player, hole_ids, community_ids, pot, to_call, street_
         facing,
     ))
 
-
+# game state -> key for CFR
 def runtime_infoset(metadata, round_state, hole_card, player_uuid):
     seats = round_state.get("seats", []) or []
     player_idx = 0
@@ -192,6 +240,7 @@ def runtime_infoset(metadata, round_state, hole_card, player_uuid):
     raises_this = 0
     total_raises = 0
     uuid_to_pos = {seat.get("uuid"): i for i, seat in enumerate(seats)}
+    # get how much each player bet ts street
     for s_name, entries in (round_state.get("action_histories", {}) or {}).items():
         for entry in entries or []:
             action = (entry.get("action") or "").upper()
@@ -258,6 +307,7 @@ def cards_from_ids(ids):
     return [CARD_BY_ID[cid] for cid in ids]
 
 
+# name preflop hand
 def preflop_class_from_ids(card_ids):
     r1, r2 = _rank_char(RANK_BY_ID[card_ids[0]]), _rank_char(RANK_BY_ID[card_ids[1]])
     suited = SUIT_BY_ID[card_ids[0]] == SUIT_BY_ID[card_ids[1]]
@@ -288,6 +338,7 @@ def _rank_char(rank):
     return "23456789TJQKA"[rank - 2]
 
 
+# score preflop class
 def _preflop_class_score(key):
     ranks = key[:2]
     r1 = RANK_ORDER.index(ranks[0]) + 2
@@ -307,11 +358,11 @@ def _preflop_class_score(key):
     return max(0.0, min(1.0, score))
 
 
+# fake random betting pot sizes to learn buckets
 def sample_betting_trace_units(rng):
     pot = 3.0
     traces = {"pot": [pot], "to_call": [1.0]}
     for street in range(4):
-        current = 2.0 if street == 0 else 0.0
         bets = [1.0, 2.0] if street == 0 else [0.0, 0.0]
         raises = 0
         acted = [False, False]

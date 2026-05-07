@@ -1,5 +1,6 @@
 import math
 import random
+import time
 
 from pypokerengine.engine.card import Card
 
@@ -31,8 +32,8 @@ DEFAULT_PARAMS = {
     "large_call_blend_units": 6.0,
     "large_call_blend_bonus": 0.04,
     "max_blend": 0.26,
+    "time_budget_sec": 0.35,
 }
-
 
 class PublicBeliefSearch:
     def __init__(self, policy, rng=None, **params):
@@ -43,8 +44,10 @@ class PublicBeliefSearch:
         self.samples = int(max(16, self.params["samples"]))
         self._range_cache = {}
 
-    def maybe_adjust_distribution(self, probs, valid_actions, hole_card, round_state, our_uuid):
+    # adjust CFR probs
+    def adjust_distribution(self, probs, valid_actions, hole_card, round_state, our_uuid):
         try:
+            deadline = time.monotonic() + max(0.005, float(self.params["time_budget_sec"]))
             if not self._should_search(probs, valid_actions, round_state, our_uuid):
                 return probs
             legal = [a for a in absn.ACTIONS if a in probs]
@@ -54,20 +57,27 @@ class PublicBeliefSearch:
             our_ids = _cards_to_ids(hole_card)
             board_ids = _cards_to_ids(round_state.get("community_card", []) or [])
             known = set(our_ids) | set(board_ids)
-            opp_uuid = _primary_opponent_uuid(round_state, our_uuid)
+            opp_uuid = _opponent_uuid(round_state, our_uuid)
             if opp_uuid is None:
                 return probs
 
-            opp_range = self._range_for_actor(round_state, opp_uuid, known)
+            opp_range = self._range_for_actor(round_state, opp_uuid, known, deadline)
             if not opp_range:
                 return probs
+            # compare our line to random hands
+            if _past_deadline(deadline):
+                return probs
             our_credibility = self._public_line_credibility(
-                round_state, our_uuid, tuple(our_ids), set(board_ids)
+                round_state, our_uuid, tuple(our_ids), set(board_ids), deadline
             )
+            if _past_deadline(deadline):
+                return probs
             evs = self._action_evs(
-                legal, valid_actions, hole_card, our_ids, board_ids,
-                opp_range, round_state, our_uuid, opp_uuid, our_credibility,
+                legal, valid_actions, our_ids, board_ids,
+                opp_range, round_state, our_uuid, opp_uuid, our_credibility, deadline,
             )
+            if _past_deadline(deadline):
+                return probs
             search_probs = _softmax(evs)
             blend = self._blend_weight(probs, round_state, our_uuid)
             mixed = {}
@@ -76,10 +86,11 @@ class PublicBeliefSearch:
                     (1.0 - blend) * max(0.0, float(probs.get(action, 0.0)))
                     + blend * max(0.0, float(search_probs.get(action, 0.0)))
                 )
-            return _normalize(mixed)
+            return absn.normalize_probs(mixed)
         except Exception:
             return probs
 
+    # search only turn/river
     def _should_search(self, probs, valid_actions, round_state, our_uuid):
         street = round_state.get("street", "preflop")
         if street == "preflop":
@@ -107,7 +118,8 @@ class PublicBeliefSearch:
             ))
         )
 
-    def _range_for_actor(self, round_state, actor_uuid, known_ids):
+    # infer likely opponent hands
+    def _range_for_actor(self, round_state, actor_uuid, known_ids, deadline):
         cache_key = _range_cache_key(round_state, actor_uuid, known_ids)
         cached = self._range_cache.get(cache_key)
         if cached is not None:
@@ -115,7 +127,11 @@ class PublicBeliefSearch:
         combos = []
         deck = [cid for cid in range(1, 53) if cid not in known_ids]
         for i, c1 in enumerate(deck):
+            if _past_deadline(deadline):
+                break
             for c2 in deck[i + 1:]:
+                if _past_deadline(deadline):
+                    break
                 hole = (c1, c2)
                 logp = self._line_loglikelihood(round_state, actor_uuid, hole)
                 combos.append((logp, hole))
@@ -134,6 +150,7 @@ class PublicBeliefSearch:
         self._range_cache[cache_key] = result
         return result
 
+    # score how action history fits hand
     def _line_loglikelihood(self, round_state, actor_uuid, hole_ids):
         histories = round_state.get("action_histories", {}) or {}
         board = round_state.get("community_card", []) or []
@@ -143,61 +160,66 @@ class PublicBeliefSearch:
             for idx, entry in enumerate(entries):
                 if entry.get("uuid") != actor_uuid:
                     continue
-                action = _norm_action(entry.get("action"))
+                action = (entry.get("action") or "").lower()
                 if action not in absn.ACTIONS:
                     continue
                 pseudo = _prefix_state(round_state, street, idx, actor_uuid, board)
-                facing = _is_facing(pseudo, actor_uuid)
-                valid = _synthetic_valid_actions(facing)
+                valid = _fake_valid_actions(_to_call(pseudo, actor_uuid) > 0)
                 hole = _ids_to_cards(hole_ids)
                 dist = self.policy.action_distribution(valid, hole, pseudo, actor_uuid)
                 logp += math.log(max(self.params["action_likelihood_floor"], float(dist.get(action, 0.0))))
         return logp
 
-    def _public_line_credibility(self, round_state, our_uuid, our_hole, board_ids):
+    # compare actual line to random hands
+    def _public_line_credibility(self, round_state, our_uuid, our_hole, board_ids, deadline):
         actual = self._line_loglikelihood(round_state, our_uuid, our_hole)
         deck = [cid for cid in range(1, 53) if cid not in board_ids]
         trials = []
         limit = min(int(self.params["credibility_samples"]), max(8, len(deck)))
         for _ in range(limit):
+            if _past_deadline(deadline):
+                break
             if len(deck) < 2:
                 break
             c1, c2 = self.rng.sample(deck, 2)
-            if c1 == c2:
-                continue
             trials.append(self._line_loglikelihood(round_state, our_uuid, (c1, c2)))
         if not trials:
             return 0.5
         below = sum(1 for v in trials if v <= actual)
         return min(1.0, max(0.0, below / float(len(trials))))
 
-    def _action_evs(self, legal, valid_actions, hole_card, our_ids, board_ids,
-                    opp_range, round_state, our_uuid, opp_uuid, credibility):
+    def _action_evs(self, legal, valid_actions, our_ids, board_ids,
+                    opp_range, round_state, our_uuid, opp_uuid, credibility, deadline):
         pot = float(absn.pot_size(round_state))
         to_call = float(_to_call(round_state, our_uuid))
         raise_amount = float(_raise_min(valid_actions) or max(to_call, 0.0))
         evs = {}
-        win_rate = self._sample_win_rate(our_ids, board_ids, opp_range)
+        win_rate = self._sample_win_rate(our_ids, board_ids, opp_range, deadline)
         showdown_call = win_rate * (pot + to_call) - (1.0 - win_rate) * to_call
 
         for action in legal:
+            if _past_deadline(deadline):
+                break
             if action == "fold":
                 evs[action] = -to_call
             elif action == "call":
                 evs[action] = showdown_call
             elif action == "raise":
                 fold_prob = self._predicted_fold_to_raise(
-                    round_state, opp_uuid, opp_range, credibility
+                    round_state, our_uuid, opp_uuid, opp_range, credibility, deadline
                 )
                 called = win_rate * (pot + raise_amount) - (1.0 - win_rate) * raise_amount
                 evs[action] = fold_prob * pot + (1.0 - fold_prob) * called
         return evs
 
-    def _sample_win_rate(self, our_ids, board_ids, opp_range):
+    # simulate random board runouts
+    def _sample_win_rate(self, our_ids, board_ids, opp_range, deadline):
         wins = 0.0
         count = 0.0
         known_base = set(our_ids) | set(board_ids)
         for _ in range(self.samples):
+            if _past_deadline(deadline):
+                break
             opp_ids = _weighted_choice(opp_range, self.rng)
             if opp_ids is None:
                 continue
@@ -212,11 +234,14 @@ class PublicBeliefSearch:
             count += 1.0
         return wins / count if count > 0.0 else 0.5
 
-    def _predicted_fold_to_raise(self, round_state, opp_uuid, opp_range, credibility):
-        pseudo = _state_after_our_raise(round_state, opp_uuid)
-        valid = _synthetic_valid_actions(True)
+    # estimate fold chance after raise
+    def _predicted_fold_to_raise(self, round_state, our_uuid, opp_uuid, opp_range, credibility, deadline):
+        pseudo = _state_after_our_raise(round_state, our_uuid, opp_uuid)
+        valid = _fake_valid_actions(True)
         fold = 0.0
         for opp_ids, weight in opp_range:
+            if _past_deadline(deadline):
+                break
             dist = self.policy.action_distribution(
                 valid, _ids_to_cards(opp_ids), pseudo, opp_uuid
             )
@@ -259,27 +284,23 @@ def _prefix_state(round_state, street, stop_idx, next_uuid, current_board):
     return pseudo
 
 
-def _state_after_our_raise(round_state, next_uuid):
+# fake state after our raise
+def _state_after_our_raise(round_state, our_uuid, opp_uuid):
     pseudo = dict(round_state)
     histories = {
         s: list((round_state.get("action_histories", {}) or {}).get(s, []) or [])
         for s in STREETS
     }
     street = round_state.get("street", "preflop")
-    seats = round_state.get("seats", []) or []
-    next_idx = _seat_index(round_state, next_uuid)
-    our_uuid = None
-    for seat in seats:
-        uuid = seat.get("uuid")
-        if uuid and uuid != next_uuid:
-            our_uuid = uuid
-            break
-    amount = _max_street_bet(round_state, street) + max(1, int(round_state.get("small_blind_amount", 10) or 10) * 2)
+    next_idx = _seat_index(round_state, opp_uuid)
+    small_blind = max(1, int(round_state.get("small_blind_amount", 10) or 10))
+    raise_add = small_blind * (4 if street in ("turn", "river") else 2)
+    amount = _max_street_bet(round_state, street) + raise_add
     histories.setdefault(street, []).append({
         "action": "RAISE",
         "amount": amount,
-        "add_amount": max(1, int(round_state.get("small_blind_amount", 10) or 10) * 2),
-        "paid": max(1, int(round_state.get("small_blind_amount", 10) or 10) * 2),
+        "add_amount": raise_add,
+        "paid": raise_add,
         "uuid": our_uuid,
     })
     pseudo["action_histories"] = histories
@@ -287,11 +308,7 @@ def _state_after_our_raise(round_state, next_uuid):
     return pseudo
 
 
-def _primary_opponent_uuid(round_state, our_uuid):
-    for seat in round_state.get("seats", []) or []:
-        uuid = seat.get("uuid")
-        if uuid and uuid != our_uuid and seat.get("state") in ("participating", "allin"):
-            return uuid
+def _opponent_uuid(round_state, our_uuid):
     for seat in round_state.get("seats", []) or []:
         uuid = seat.get("uuid")
         if uuid and uuid != our_uuid:
@@ -318,17 +335,11 @@ def _range_cache_key(round_state, actor_uuid, known_ids):
         tuple(hist_sig),
     )
 
-
 def _seat_index(round_state, uuid):
     for i, seat in enumerate(round_state.get("seats", []) or []):
         if seat.get("uuid") == uuid:
             return i
     return 0
-
-
-def _is_facing(round_state, uuid):
-    return _to_call(round_state, uuid) > 0
-
 
 def _to_call(round_state, uuid):
     street = round_state.get("street", "preflop")
@@ -341,6 +352,7 @@ def _to_call(round_state, uuid):
         pos = uuid_to_pos.get(entry.get("uuid"))
         if pos is None or action == "FOLD":
             continue
+        # blinds count as paid bets
         if action in ("CALL", "RAISE", "SMALLBLIND", "BIGBLIND"):
             bets[pos] = max(bets[pos], int(entry.get("amount", 0) or 0))
     if idx >= len(bets):
@@ -356,14 +368,14 @@ def _max_street_bet(round_state, street):
     return max_bet
 
 
-def _synthetic_valid_actions(facing):
-    call_amount = 10 if facing else 0
+# engine format for fake states
+def _fake_valid_actions(facing_bet):
+    call_amount = 10 if facing_bet else 0
     return [
         {"action": "fold", "amount": 0},
         {"action": "call", "amount": call_amount},
         {"action": "raise", "amount": {"min": 20, "max": 1000}},
     ]
-
 
 def _raise_min(valid_actions):
     for action in valid_actions:
@@ -374,7 +386,6 @@ def _raise_min(valid_actions):
             return amount.get("min", 0) or 0
         return amount or 0
     return 0
-
 
 def _raise_max(valid_actions):
     for action in valid_actions:
@@ -400,20 +411,11 @@ def _policy_margin(probs):
         return 1.0
     return vals[0] - vals[1]
 
-
 def _cards_to_ids(cards):
     return [Card.from_str(c).to_id() for c in cards]
 
-
 def _ids_to_cards(ids):
     return [str(absn.CARD_BY_ID[cid]) for cid in ids]
-
-
-def _norm_action(action):
-    action = (action or "").lower()
-    if action in ("smallblind", "bigblind", "ante"):
-        return None
-    return action if action in absn.ACTIONS else None
 
 
 def _weighted_choice(weighted, rng):
@@ -429,13 +431,16 @@ def _weighted_choice(weighted, rng):
     return weighted[-1][0]
 
 
+def _past_deadline(deadline):
+    return time.monotonic() >= deadline
+
 def _softmax(evs):
     if not evs:
         return {}
     scale = max(1.0, max(abs(v) for v in evs.values()) / 4.0)
     best = max(evs.values())
     raw = {a: math.exp((v - best) / scale) for a, v in evs.items()}
-    return _normalize(raw)
+    return absn.normalize_probs(raw)
 
 
 def _normalize_params(params):
@@ -453,11 +458,3 @@ def _normalize_params(params):
     merged["max_blend"] = max(0.0, min(1.0, merged["max_blend"]))
     merged["max_fold_to_raise"] = max(0.0, min(1.0, merged["max_fold_to_raise"]))
     return merged
-
-
-def _normalize(probs):
-    total = sum(max(0.0, float(v)) for v in probs.values())
-    if total <= 1e-12:
-        n = max(1, len(probs))
-        return {a: 1.0 / n for a in probs}
-    return {a: max(0.0, float(v)) / total for a, v in probs.items()}

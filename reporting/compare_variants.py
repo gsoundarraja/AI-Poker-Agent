@@ -9,22 +9,20 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from reporting.gather_baselines import FIELD_OPPONENTS, opponent_suite
+from reporting.gather_baselines import opponent_suite
 from reporting.randomized_opponents import randomized_opponent_specs
 from reporting.variants import CheckpointAgent, COMPONENT_VARIANTS, VARIANTS
 from training.selfplay import run_match
 
 
-OUT_ROWS = os.path.join(ROOT, "final_project", "tables", "robust_variant_rows.csv")
-OUT_SUMMARY = os.path.join(ROOT, "final_project", "tables", "robust_variant_summary.csv")
+OUT_ROWS = os.path.join(ROOT, "final_project", "tables", "variant_comparison_rows.csv")
+OUT_SUMMARY = os.path.join(ROOT, "final_project", "tables", "variant_comparison_summary.csv")
 CHECKPOINT_DIR = os.path.join(ROOT, "data", "checkpoints")
-CHECKPOINT_LABELS = ("120228", "130002", "138000", "140004", "141918", "142002", "143004", "145002", "151464", "195510")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--splits", default="validation,test",
-                    help="Comma-separated split names: train,validation,test")
+    ap.add_argument("--splits", default="validation,test")
     ap.add_argument("--games", type=int, default=12)
     ap.add_argument("--hands", type=int, default=100)
     ap.add_argument("--stack", type=int, default=1000)
@@ -34,8 +32,7 @@ def main():
     ap.add_argument("--checkpoint-count", type=int, default=4)
     ap.add_argument("--static-suite", choices=("none", "field", "core", "extended", "all"), default="field")
     ap.add_argument("--include-controls", action="store_true")
-    ap.add_argument("--variants", default="",
-                    help="Comma-separated variant names; default runs component variants.")
+    ap.add_argument("--variants", default="")
     ap.add_argument("--seed", type=int, default=683)
     args = ap.parse_args()
 
@@ -56,9 +53,9 @@ def main():
     write_rows(OUT_ROWS, rows)
     summary = summarize(rows)
     write_summary(OUT_SUMMARY, summary)
-    print("Wrote {}".format(OUT_ROWS))
-    print("Wrote {}".format(OUT_SUMMARY))
-    print("Total elapsed {:.1f}s".format(time.time() - t0))
+    print("wrote {}".format(OUT_ROWS))
+    print("wrote {}".format(OUT_SUMMARY))
+    print("sec {:.1f}".format(time.time() - t0))
     for row in summary:
         print("{split:10s} {variant:28s} q25={q25_cpg:+.1f} med={median_cpg:+.1f} mean={mean_cpg:+.1f} min={min_cpg:+.1f} win={win_fraction:.3f}".format(**row))
 
@@ -71,7 +68,7 @@ def select_variants(args):
     selected = [(name, cls) for name, cls in variants if name in requested]
     missing = requested - {name for name, _ in selected}
     if missing:
-        raise ValueError("unknown variants: {}".format(", ".join(sorted(missing))))
+        raise ValueError("bad variants: {}".format(", ".join(sorted(missing))))
     return selected
 
 
@@ -90,8 +87,7 @@ def build_opponents(args, split):
         })
 
     if args.static_suite != "none":
-        static = FIELD_OPPONENTS if args.static_suite == "field" else opponent_suite(args.static_suite)
-        for name, cls in static:
+        for name, cls in opponent_suite(args.static_suite):
             opponents.append({
                 "name": "{}_static_{}".format(split, name),
                 "kind": "static",
@@ -120,27 +116,40 @@ def build_opponents(args, split):
 
 
 def checkpoint_labels(count):
+    labels = available_checkpoint_labels()
     if count <= 0:
         return []
-    if count >= len(CHECKPOINT_LABELS):
-        return list(CHECKPOINT_LABELS)
+    if count >= len(labels):
+        return labels
     if count == 1:
-        return [CHECKPOINT_LABELS[-1]]
-    step = (len(CHECKPOINT_LABELS) - 1) / float(count - 1)
+        return [labels[-1]] if labels else []
+    step = (len(labels) - 1) / float(count - 1)
     picks = []
     for i in range(count):
-        picks.append(CHECKPOINT_LABELS[int(round(i * step))])
+        picks.append(labels[int(round(i * step))])
     return list(dict.fromkeys(picks))
+
+
+def available_checkpoint_labels():
+    labels = []
+    if not os.path.isdir(CHECKPOINT_DIR):
+        return labels
+    for name in os.listdir(CHECKPOINT_DIR):
+        if not name.startswith("cfr_strategy_6336_") or not name.endswith("k.json"):
+            continue
+        label = name.rsplit("_", 1)[1][:-6]
+        labels.append(label)
+    return sorted(labels, key=lambda x: int(x))
 
 
 def run_split(args, split, variants, opponents, pool):
     rows = []
-    with ThreadPoolExecutor(max_workers=max(1, min(64, len(variants) * len(opponents)))) as tpool:
+    with ThreadPoolExecutor(max_workers=max(1, len(variants) * len(opponents))) as tpool:
         futures = {}
         for variant_name, VariantCls in variants:
             for opp in opponents:
                 label = "{} {} vs {}".format(split, variant_name, opp["name"])
-                print("Submitting {}".format(label))
+                print("run {}".format(label))
                 futures[(variant_name, opp["name"], opp["kind"])] = tpool.submit(
                     run_match,
                     VariantCls,
@@ -176,7 +185,7 @@ def run_split(args, split, variants, opponents, pool):
                 "elapsed_sec": round(res["elapsed_sec"], 3),
             }
             rows.append(row)
-            print("  {} vs {}: {:+.1f} ({}/{})".format(
+            print("{} vs {} {:+.1f} ({}/{})".format(
                 variant_name, opp_name, res["chips_per_game_1"], res["wins1"], res["games"]
             ))
     return rows

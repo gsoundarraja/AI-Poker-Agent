@@ -1042,19 +1042,8 @@ pages={194–197}
     number = "2",
     year = "2020"
 }
-@inproceedings{brown2017libratus,
-author = {Brown, Noam and Sandholm, Tuomas},
-title = {Libratus: the superhuman AI for no-limit poker},
-year = {2017},
-isbn = {9780999241103},
-publisher = {AAAI Press},
-abstract = {No-limit Texas Hold'em is the most popular variant of poker in the world. Heads-up no-limit Texas Hold'em is the main benchmark challenge for AI in imperfect-information games. We present Libratus, the first--and so far only--AI to defeat top human professionals in that game. Libratus's architecture features three main modules, each of which has new algorithms: pre-computing a solution to an abstraction of the game which provides a high-level blueprint for the strategy of the AI, a new nested subgame-solving algorithm which repeatedly calculates a more detailed strategy as play progresses, and a self-improving module which augments the pre-computed blueprint over time.},
-booktitle = {Proceedings of the 26th International Joint Conference on Artificial Intelligence},
-pages = {5226–5228},
-numpages = {3},
-location = {Melbourne, Australia},
-series = {IJCAI'17}
-}
+
+
 
 
 
@@ -1077,22 +1066,6 @@ pages = {81–88},
 numpages = {8}
 }
 
-
-
-@article{moravcik2017deepstack,
-author = {Matej Moravčík  and Martin Schmid  and Neil Burch  and Viliam Lisý  and Dustin Morrill  and Nolan Bard  and Trevor Davis  and Kevin Waugh  and Michael Johanson  and Michael Bowling },
-title = {DeepStack: Expert-level artificial intelligence in heads-up no-limit poker},
-journal = {Science},
-volume = {356},
-number = {6337},
-pages = {508-513},
-year = {2017},
-doi = {10.1126/science.aam6960},
-URL = {https://www.science.org/doi/abs/10.1126/science.aam6960},
-eprint = {https://www.science.org/doi/pdf/10.1126/science.aam6960},
-abstract = {Computer code based on continual problem re-solving beats human professional poker players at a two-player variant of poker. Computers can beat humans at games as complex as chess or go. In these and similar games, both players have access to the same information, as displayed on the board. Although computers have the ultimate poker face, it has been tricky to teach them to be good at poker, where players cannot see their opponents' cards. Moravčík et al. built a code dubbed DeepStack that managed to beat professional poker players at a two-player poker variant called heads-up no-limit Texas hold'em. Instead of devising its strategy beforehand, DeepStack recalculated it at each step, taking into account the current state of the game. The principles behind DeepStack may enable advances in solving real-world problems that involve information asymmetry. Science, this issue p. 508 Artificial intelligence has seen several breakthroughs in recent years, with games often serving as milestones. A common feature of these games is that players have perfect information. Poker, the quintessential game of imperfect information, is a long-standing challenge problem in artificial intelligence. We introduce DeepStack, an algorithm for imperfect-information settings. It combines recursive reasoning to handle information asymmetry, decomposition to focus computation on the relevant decision, and a form of intuition that is automatically learned from self-play using deep learning. In a study involving 44,000 hands of poker, DeepStack defeated, with statistical significance, professional poker players in heads-up no-limit Texas hold’em. The approach is theoretically sound and is shown to produce strategies that are more difficult to exploit than prior approaches.}}
-
-
 @inproceedings{brown2015hierarchical,
 author = {Brown, Noam and Ganzfried, Sam and Sandholm, Tuomas},
 title = {Hierarchical Abstraction, Distributed Equilibrium Computation, and Post-Processing, with Application to a Champion No-Limit Texas Hold'em Agent},
@@ -1109,8 +1082,44 @@ location = {Istanbul, Turkey},
 series = {AAMAS '15}
 }
 
+@inproceedings{NIPS2017_7fe1f8ab,
+ author = {Brown, Noam and Sandholm, Tuomas},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {I. Guyon and U. Von Luxburg and S. Bengio and H. Wallach and R. Fergus and S. Vishwanathan and R. Garnett},
+ pages = {},
+ publisher = {Curran Associates, Inc.},
+ title = {Safe and Nested Subgame Solving for Imperfect-Information Games},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2017/file/7fe1f8abaad094e0b5cb1b01d712f708-Paper.pdf},
+ volume = {30},
+ year = {2017}
+}
+
+@inproceedings{brown2017libratus,
+author = {Brown, Noam and Sandholm, Tuomas},
+title = {Libratus: the superhuman AI for no-limit poker},
+year = {2017},
+isbn = {9780999241103},
+publisher = {AAAI Press},
+abstract = {No-limit Texas Hold'em is the most popular variant of poker in the world. Heads-up no-limit Texas Hold'em is the main benchmark challenge for AI in imperfect-information games. We present Libratus, the first--and so far only--AI to defeat top human professionals in that game. Libratus's architecture features three main modules, each of which has new algorithms: pre-computing a solution to an abstraction of the game which provides a high-level blueprint for the strategy of the AI, a new nested subgame-solving algorithm which repeatedly calculates a more detailed strategy as play progresses, and a self-improving module which augments the pre-computed blueprint over time.},
+booktitle = {Proceedings of the 26th International Joint Conference on Artificial Intelligence},
+pages = {5226–5228},
+numpages = {3},
+location = {Melbourne, Australia},
+series = {IJCAI'17}
+}
+
+@article{Brown2018SuperhumanAF,
+  title={Superhuman AI for heads-up no-limit poker: Libratus beats top professionals},
+  author={Noam Brown and Tuomas Sandholm},
+  journal={Science},
+  year={2018},
+  volume={359},
+  pages={418 - 424},
+  url={https://api.semanticscholar.org/CorpusID:5003977}
+}
+
 @article{brown2019poker,
-author = {Noam Brown  and Tuomas Sandholm },
+author = {Noam Brown  and Tuomas Sandholm },
 title = {Superhuman AI for multiplayer poker},
 journal = {Science},
 volume = {365},
@@ -1122,3 +1131,63 @@ URL = {https://www.science.org/doi/abs/10.1126/science.aay2400},
 eprint = {https://www.science.org/doi/pdf/10.1126/science.aay2400},
 abstract = {Computer programs have shown superiority over humans in two-player games such as chess, Go, and heads-up, no-limit Texas hold'em poker. However, poker games usually include six players—a much trickier challenge for artificial intelligence than the two-player variant. Brown and Sandholm developed a program, dubbed Pluribus, that learned how to play six-player no-limit Texas hold'em by playing against five copies of itself (see the Perspective by Blair and Saffidine). When pitted against five elite professional poker players, or with five copies of Pluribus playing against one professional, the computer performed significantly better than humans over the course of 10,000 hands of poker. Science, this issue p. 885; see also p. 864 An AI dubbed Pluribus performs significantly better than human professionals in six-player no-limit Texas hold’em poker. In recent years there have been great strides in artificial intelligence (AI), with games often serving as challenge problems, benchmarks, and milestones for progress. Poker has served for decades as such a challenge problem. Past successes in such benchmarks, including poker, have been limited to two-player games. However, poker in particular is traditionally played with more than two players. Multiplayer games present fundamental additional issues beyond those in two-player games, and multiplayer poker is a recognized AI milestone. In this paper we present Pluribus, an AI that we show is stronger than top human professionals in six-player no-limit Texas hold’em poker, the most popular form of poker played by humans.}}
 
+@inproceedings{NIPS2009_00411460,
+ author = {Lanctot, Marc and Waugh, Kevin and Zinkevich, Martin and Bowling, Michael},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {Y. Bengio and D. Schuurmans and J. Lafferty and C. Williams and A. Culotta},
+ pages = {},
+ publisher = {Curran Associates, Inc.},
+ title = {Monte Carlo Sampling for Regret Minimization in Extensive Games},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2009/file/00411460f7c92d2124a67ea0f4cb5f85-Paper.pdf},
+ volume = {22},
+ year = {2009}
+}
+
+@article{moravcik2017deepstack,
+author = {Matej Moravčík  and Martin Schmid  and Neil Burch  and Viliam Lisý  and Dustin Morrill  and Nolan Bard  and Trevor Davis  and Kevin Waugh  and Michael Johanson  and Michael Bowling },
+title = {DeepStack: Expert-level artificial intelligence in heads-up no-limit poker},
+journal = {Science},
+volume = {356},
+number = {6337},
+pages = {508-513},
+year = {2017},
+doi = {10.1126/science.aam6960},
+URL = {https://www.science.org/doi/abs/10.1126/science.aam6960},
+eprint = {https://www.science.org/doi/pdf/10.1126/science.aam6960},
+abstract = {Computer code based on continual problem re-solving beats human professional poker players at a two-player variant of poker. Computers can beat humans at games as complex as chess or go. In these and similar games, both players have access to the same information, as displayed on the board. Although computers have the ultimate poker face, it has been tricky to teach them to be good at poker, where players cannot see their opponents' cards. Moravčík et al. built a code dubbed DeepStack that managed to beat professional poker players at a two-player poker variant called heads-up no-limit Texas hold'em. Instead of devising its strategy beforehand, DeepStack recalculated it at each step, taking into account the current state of the game. The principles behind DeepStack may enable advances in solving real-world problems that involve information asymmetry. Science, this issue p. 508 Artificial intelligence has seen several breakthroughs in recent years, with games often serving as milestones. A common feature of these games is that players have perfect information. Poker, the quintessential game of imperfect information, is a long-standing challenge problem in artificial intelligence. We introduce DeepStack, an algorithm for imperfect-information settings. It combines recursive reasoning to handle information asymmetry, decomposition to focus computation on the relevant decision, and a form of intuition that is automatically learned from self-play using deep learning. In a study involving 44,000 hands of poker, DeepStack defeated, with statistical significance, professional poker players in heads-up no-limit Texas hold’em. The approach is theoretically sound and is shown to produce strategies that are more difficult to exploit than prior approaches.}}
+
+@InProceedings(05uai,
+  Title = "Bayes' Bluff: {O}pponent Modelling in Poker",
+  Author = "Finnegan Southey and Michael Bowling and Bryce Larson and Carmelo Piccione and Neil Burch and Darse Billings and Chris Rayner",
+  Booktitle = "Proceedings of the Twenty-First Conference on Uncertaintyin Artificial Intelligence (UAI)",
+  Pages = "550--558",
+  Year = "2005",
+  AcceptRate = "34\%",
+  AcceptNumbers = "83 of 243"
+)
+
+@article{DBLP:journals/corr/Tammelin14,
+  author       = {Oskari Tammelin},
+  title        = {Solving Large Imperfect Information Games Using {CFR+}},
+  journal      = {CoRR},
+  volume       = {abs/1407.5042},
+  year         = {2014},
+  url          = {http://arxiv.org/abs/1407.5042},
+  eprinttype   = {arXiv},
+  eprint       = {1407.5042},
+  timestamp    = {Mon, 13 Aug 2018 16:48:36 +0200},
+  biburl       = {https://dblp.org/rec/journals/corr/Tammelin14.bib},
+  bibsource    = {dblp computer science bibliography, https://dblp.org}
+}
+
+@inproceedings{NIPS2007_08d98638,
+ author = {Zinkevich, Martin and Johanson, Michael and Bowling, Michael and Piccione, Carmelo},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {J. Platt and D. Koller and Y. Singer and S. Roweis},
+ pages = {},
+ publisher = {Curran Associates, Inc.},
+ title = {Regret Minimization in Games with Incomplete Information},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2007/file/08d98638c6fcd194a4b1e6992063e944-Paper.pdf},
+ volume = {20},
+ year = {2007}
+}

@@ -30,13 +30,8 @@ class CFRPolicy:
             use_preflop_lookup=use_preflop_lookup,
         )
 
-    def choose_action(self, valid_actions, hole_card, round_state, player_uuid, rng=None):
-        rng = rng or random
-        probs = self.action_distribution(valid_actions, hole_card, round_state, player_uuid)
-        return self.sample_action(probs, rng)
-
     def action_distribution(self, valid_actions, hole_card, round_state, player_uuid):
-        legal = self._legal_actions(valid_actions)
+        legal = absn.legal_action_names(valid_actions)
         if not legal:
             return {"fold": 1.0}
         if self._preflop is not None:
@@ -47,27 +42,22 @@ class CFRPolicy:
                 return preflop
         key = absn.runtime_infoset(self.abstraction, round_state, hole_card, player_uuid)
         probs = self._lookup_probs(key)
-        masked = {a: max(0.0, float(probs.get(a, 0.0))) for a in legal}
-        return self._normalize(masked)
+        return absn.mask_probs(probs, valid_actions)
 
     def sample_action(self, probs, rng=None):
         rng = rng or random
         if not probs:
             return "fold"
-        masked = {a: max(0.0, float(p)) for a, p in probs.items()}
-        total = sum(masked.values())
-        if total <= 1e-12:
-            masked = {a: 1.0 for a in probs}
-            total = float(len(masked))
-        pick = rng.random() * total
+        probs = absn.normalize_probs(probs)
+        pick = rng.random()
         acc = 0.0
         for action in absn.ACTIONS:
-            if action not in masked:
+            if action not in probs:
                 continue
-            acc += masked[action]
+            acc += probs[action]
             if pick <= acc:
                 return action
-        return list(masked)[-1]
+        return list(probs)[-1]
 
     def _lookup_probs(self, key):
         probs = self.strategy.get(key)
@@ -81,45 +71,25 @@ class CFRPolicy:
     def _nearest_key(self, key):
         if not self._keys:
             return None
-        target = _parse_key(key)
+        target = absn.parse_infoset_key(key)
+        if target is None:
+            return None
         best_key = None
         best_dist = None
         for cand in self._keys:
-            vals = _parse_key(cand)
-            if vals[0] != target[0]:
+            vals = absn.parse_infoset_key(cand)
+            if vals is None or vals[absn.INFOSET_STREET] != target[absn.INFOSET_STREET]:
                 continue
             dist = (
-                4 * abs(vals[3] - target[3])
-                + 2 * abs(vals[4] - target[4])
-                + 2 * abs(vals[5] - target[5])
-                + abs(vals[6] - target[6])
-                + abs(vals[7] - target[7])
-                + abs(vals[8] - target[8])
-                + abs(vals[9] - target[9])
+                4 * abs(vals[absn.INFOSET_CARD_BUCKET] - target[absn.INFOSET_CARD_BUCKET])
+                + 2 * abs(vals[absn.INFOSET_POT_BUCKET] - target[absn.INFOSET_POT_BUCKET])
+                + 2 * abs(vals[absn.INFOSET_CALL_BUCKET] - target[absn.INFOSET_CALL_BUCKET])
+                + abs(vals[absn.INFOSET_STREET_RAISES] - target[absn.INFOSET_STREET_RAISES])
+                + abs(vals[absn.INFOSET_TOTAL_RAISES] - target[absn.INFOSET_TOTAL_RAISES])
+                + abs(vals[absn.INFOSET_MAX_BET] - target[absn.INFOSET_MAX_BET])
+                + abs(vals[absn.INFOSET_FACING] - target[absn.INFOSET_FACING])
             )
             if best_dist is None or dist < best_dist:
                 best_key = cand
                 best_dist = dist
         return best_key
-
-    def _normalize(self, probs):
-        total = sum(max(0.0, float(v)) for v in probs.values())
-        if total <= 1e-12:
-            n = max(1, len(probs))
-            return {a: 1.0 / n for a in probs}
-        return {a: max(0.0, float(v)) / total for a, v in probs.items()}
-
-    def _legal_actions(self, valid_actions):
-        legal = [a["action"] for a in valid_actions]
-        call_amount = None
-        for action in valid_actions:
-            if action.get("action") == "call":
-                call_amount = action.get("amount")
-                break
-        if isinstance(call_amount, (int, float)) and call_amount <= 0 and "call" in legal:
-            legal = [a for a in legal if a != "fold"]
-        return legal
-
-
-def _parse_key(key):
-    return tuple(int(x) for x in key.split("|"))

@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir))
 from agent import cfr_abstraction as absn
 
 
+# train MCCFR
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
 ABSTRACTION_PATH = os.path.join(DATA_DIR, "cfr_abstraction.json")
@@ -20,7 +21,7 @@ STRATEGY_PATH = os.path.join(DATA_DIR, "cfr_strategy.json")
 META_PATH = os.path.join(DATA_DIR, "cfr_training_meta.json")
 CURVE_PATH = os.path.join(DATA_DIR, "cfr_training_curve.csv")
 LOCK_PATH = os.path.join(DATA_DIR, "cfr_training.lock")
-TRAINER_RULES_VERSION = "compact_pypokerengine_v2"
+TRAINER_RULES_VERSION = "v2"
 
 
 BOARD_CARDS_BY_STREET = (0, 3, 4, 5)
@@ -234,6 +235,7 @@ def infoset(metadata, state, deal, sb):
     )
 
 
+# if pos regret choose often if none chose equally
 def regret_matching(regrets, legal):
     legal_idx = [ACTION_INDEX[a] for a in legal]
     positives = [0.0, 0.0, 0.0]
@@ -281,6 +283,7 @@ def get_combined_regrets(base, delta, key, cfr_plus=False):
 
 
 def add_regret(table, base, key, idx, value, cfr_plus=False):
+    # CFR+ clip neg regret
     if key not in table:
         table[key] = [0.0, 0.0, 0.0]
     if not cfr_plus:
@@ -292,6 +295,7 @@ def add_regret(table, base, key, idx, value, cfr_plus=False):
     table[key][idx] = max(0.0, current + value) - base_value
 
 
+# MCCFR recursion
 def cfr(state, deal, traverser, metadata, base_regrets, regret_delta, strategy_delta,
         legal_masks, rng, stack, sb, reach_i, reach_opp, cfr_plus=False):
     if state.terminal:
@@ -306,6 +310,7 @@ def cfr(state, deal, traverser, metadata, base_regrets, regret_delta, strategy_d
     strategy = regret_matching(regrets, legal)
     player = state.current_player
 
+    # traverse every action
     if player == traverser:
         action_utils = {}
         node_util = 0.0
@@ -327,6 +332,7 @@ def cfr(state, deal, traverser, metadata, base_regrets, regret_delta, strategy_d
             add_vec(strategy_delta, key, idx, reach_i * strategy[idx])
         return node_util
 
+    # sample opp action
     action, prob = sample_action(strategy, legal, rng)
     return cfr(
         apply_action(state, action, deal, stack, sb), deal, traverser,
@@ -501,23 +507,12 @@ def acquire_training_lock(path, force=False):
     payload = {
         "pid": os.getpid(),
         "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "message": "Remove this file only if no train_mccfr.py process is running.",
+        "message": "train lock",
     }
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
-        try:
-            with open(path, "r") as f:
-                existing = f.read().strip()
-        except Exception:
-            existing = ""
-        raise RuntimeError(
-            "Refusing to train because {} already exists. Another trainer may "
-            "be writing cfr_strategy.json. Stop that process, or rerun with "
-            "--force-lock only after verifying the lock is stale. Lock contents: {}".format(
-                path, existing or "<unreadable>"
-            )
-        )
+        raise RuntimeError("lock exists: {}".format(path))
     with os.fdopen(fd, "w") as f:
         json.dump(payload, f, indent=2, sort_keys=True)
 
@@ -546,12 +541,7 @@ def main():
     parser.add_argument("--rebuild-abstraction", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--max-batches", type=int, default=0)
-    parser.add_argument(
-        "--target-total-traversals",
-        type=int,
-        default=0,
-        help="Stop after the checkpoint reaches at least this total traversal count",
-    )
+    parser.add_argument("--target-total-traversals", type=int, default=0)
     parser.add_argument("--force-lock", action="store_true")
     parser.add_argument("--cfr-plus", action="store_true")
     args = parser.parse_args()
@@ -564,7 +554,7 @@ def main():
         sys.exit(str(exc))
 
     if args.rebuild_abstraction or not os.path.exists(ABSTRACTION_PATH):
-        print("Learning abstraction from {} sampled deals/traces...".format(args.abstraction_samples), flush=True)
+        print("learn abstraction {}".format(args.abstraction_samples), flush=True)
         metadata = absn.learn_abstraction(
             args.abstraction_samples,
             args.seed,
@@ -586,28 +576,16 @@ def main():
         previous_regret_update = previous_meta.get("regret_update", "cfr")
         if previous_rules and previous_rules != TRAINER_RULES_VERSION:
             print(
-                "WARNING: checkpoint trainer_rules={} differs from current {}. "
-                "For a clean rule-matched policy, train without --resume.".format(
-                    previous_rules, TRAINER_RULES_VERSION
-                ),
+                "warning: rules {} != {}".format(previous_rules, TRAINER_RULES_VERSION),
                 flush=True,
             )
         elif not previous_rules and previous_meta:
-            print(
-                "WARNING: checkpoint has no trainer_rules metadata. "
-                "If it was trained before rule-matching, --resume will mix training games.",
-                flush=True,
-            )
+            print("warning: no trainer_rules", flush=True)
         if previous_regret_update != regret_update:
-            sys.exit(
-                "Refusing to resume {} checkpoint with {} mode. Train from scratch "
-                "without --resume, or use the matching regret mode.".format(
-                    previous_regret_update, regret_update
-                )
-            )
+            sys.exit("regret mode mismatch: {} vs {}".format(previous_regret_update, regret_update))
         regret_sum, strategy_sum, legal_masks = load_checkpoint(STRATEGY_PATH)
         print(
-            "Resumed {} regret infosets; previous total traversals={}".format(
+            "resume infosets={} traversals={}".format(
                 len(regret_sum), previous_traversals
             ),
             flush=True,
@@ -622,11 +600,11 @@ def main():
     traversals = 0
     batches = 0
     workers = max(1, args.workers)
-    print("Training MCCFR: workers={}, merge_interval={}, stack={}, sb={}".format(
+    print("train workers={} merge={} stack={} sb={}".format(
         workers, args.merge_interval, args.stack, args.small_blind), flush=True)
-    print("Regret update: {}".format(regret_update), flush=True)
+    print("regret={}".format(regret_update), flush=True)
     if args.target_total_traversals:
-        print("Target total traversals: {}".format(args.target_total_traversals), flush=True)
+        print("target={}".format(args.target_total_traversals), flush=True)
 
     with ProcessPoolExecutor(max_workers=workers) as pool:
         while True:
@@ -658,7 +636,7 @@ def main():
             total_traversals = previous_traversals + traversals
             total_elapsed = previous_elapsed + elapsed
             print(
-                "batch={} run_traversals={} total_traversals={} infosets={} elapsed={:.1f}s util_sum={:.1f}".format(
+                "batch={} run={} total={} infosets={} sec={:.1f} util={:.1f}".format(
                     batches, traversals, total_traversals, len(regret_sum), elapsed, util
                 ),
                 flush=True,
